@@ -1,0 +1,23 @@
+node_modules/
+dist/
+artifacts/
+coverage/
+playwright-report/
+test-results/
+*.log
+
+# Local configuration and signing material must never be committed.
+.env
+.env.*
+!.env.example
+certificates/
+signing/
+profiles.xml
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+*.wgt
+*.bin
+.DS_Store

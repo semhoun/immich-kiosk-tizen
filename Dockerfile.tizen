@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1.7
+# Official installers are NOT redistributed. Supply one outside the build context.
+# Official Linux CLI distribution (download under its license, no bundled secrets):
+# https://download.tizen.org/sdk/Installer/tizen-studio_6.1/web-cli_Tizen_Studio_6.1_ubuntu-64.bin
+# References: developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/installing-tv-sdk.html
+# Samsung requires separate TV and Certificate Extension licenses. WebCLI alone
+# does not provide Samsung certificate creation. Certificate Extension >=2.0.73
+# is required after September 2025. Account interaction is not automated here.
+FROM ubuntu:22.04@sha256:b8b6ee6aa931ecd9d0d952abc34dc0e5f7c6a30c6bb71b079fe399fde0329c02
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates gosu openjdk-17-jre-headless unzip zip libusb-1.0-0 libncurses5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 1000 sdk && mkdir -p /opt/tizen-studio \
+    && chown sdk:sdk /opt/tizen-studio
+ARG TIZEN_ACCEPT_LICENSE=no
+ARG TIZEN_INSTALLER_SHA256=unset
+# Add only package IDs verified with package-manager-cli show-pkgs for your installer.
+# This does not invent Samsung extension IDs or accept their terms by default.
+ARG TIZEN_PACKAGES=WebCLI
+USER sdk
+RUN --mount=type=secret,id=tizen_installer,target=/run/tizen-installer.bin,uid=1000,required=true \
+    test "$TIZEN_ACCEPT_LICENSE" = yes \
+    && test ${#TIZEN_INSTALLER_SHA256} -eq 64 \
+    && printf '%s  %s\n' "$TIZEN_INSTALLER_SHA256" /run/tizen-installer.bin | sha256sum -c - \
+    && bash /run/tizen-installer.bin --accept-license /opt/tizen-studio \
+    && /opt/tizen-studio/package-manager/package-manager-cli.bin install --accept-license $TIZEN_PACKAGES \
+    && test -x /opt/tizen-studio/tools/ide/bin/tizen \
+    && test -x /opt/tizen-studio/tools/sdb
+USER root
+# Installer records its user's home in SDK data paths; keep those paths private too.
+RUN mv /home/sdk /signing && ln -s /signing /home/sdk && chmod 700 /signing
+COPY tools/tizen-entrypoint.sh /usr/local/bin/tizen-entrypoint
+COPY tools/tizen.sh /usr/local/bin/tizen-tool
+RUN chmod 755 /usr/local/bin/tizen-entrypoint /usr/local/bin/tizen-tool
+ENV HOME=/signing PATH=/opt/tizen-studio/tools/ide/bin:/opt/tizen-studio/tools:$PATH
+WORKDIR /workspace
+ENTRYPOINT ["/usr/local/bin/tizen-entrypoint"]
+CMD ["doctor"]

@@ -1,0 +1,8 @@
+# Allowlist keeps certificates, settings, outputs and local secrets out of images.
+**
+!Dockerfile
+!Dockerfile.tizen
+!package.json
+!package-lock.json
+!tools/
+!tools/**

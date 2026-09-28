@@ -1,0 +1,71 @@
+name: immich-kiosk-tizen
+
+x-tooling: &tooling
+  image: immich-kiosk-tizen-tools:node22.14.0-pw1.51.1
+  build: .
+  init: true
+  working_dir: /workspace
+  environment: &environment
+    LOCAL_UID: ${LOCAL_UID:-1000}
+    LOCAL_GID: ${LOCAL_GID:-1000}
+    HOME: /cache/home
+    npm_config_cache: /cache/npm
+  volumes:
+    - .:/workspace
+    - dependencies:/workspace/node_modules
+    - cache:/cache
+  shm_size: 1gb
+
+services:
+  tooling:
+    <<: *tooling
+    profiles: [tools]
+  dev:
+    <<: *tooling
+    command: [npm, run, dev]
+    ports: ["${PREVIEW_HOST:-0.0.0.0}:${PREVIEW_PORT:-8080}:8080"]
+  browser:
+    <<: *tooling
+    profiles: [test]
+    command: [npm, run, "test:browser"]
+  tizen: &tizen
+    image: immich-kiosk-tizen-sdk:local
+    profiles: [tizen]
+    build:
+      context: .
+      dockerfile: Dockerfile.tizen
+      args:
+        TIZEN_ACCEPT_LICENSE: ${TIZEN_ACCEPT_LICENSE:-no}
+        TIZEN_INSTALLER_SHA256: ${TIZEN_INSTALLER_SHA256:-unset}
+        TIZEN_PACKAGES: ${TIZEN_PACKAGES:-WebCLI}
+      secrets: [tizen_installer]
+    init: true
+    working_dir: /workspace
+    environment:
+      <<: *environment
+      HOME: /signing
+    volumes:
+      - .:/workspace
+      - signing:/signing
+      - type: bind
+        source: ${TIZEN_CERTIFICATES_DIR:-/nonexistent/tizen-certificates}
+        target: /certificates
+        read_only: true
+        bind:
+          create_host_path: false
+    command: [doctor]
+  # Linux-only fallback after bridge connectivity has been tested with the TV.
+  # No ports, privilege escalation or Docker socket; deliberately not the default.
+  tizen-host:
+    <<: *tizen
+    profiles: [tizen-host]
+    network_mode: host
+
+secrets:
+  tizen_installer:
+    file: ${TIZEN_INSTALLER_FILE:-/nonexistent/tizen-studio-installer.bin}
+
+volumes:
+  dependencies:
+  cache:
+  signing:
