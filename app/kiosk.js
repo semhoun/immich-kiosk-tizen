@@ -2,7 +2,7 @@ import { baseURL, imageURL, request, KioskError } from './network.js';
 import { normalizeSettings } from './settings.js';
 export { KioskError } from './network.js';
 
-// Source-reviewed contract, not a claim of integration against a deployed server.
+// Source-reviewed reference, not a version restriction or compatibility guarantee.
 export const CONTRACT = {
   version: 'v0.44.1',
   commit: 'd567ac041fc93c3d5421aecdcdf5941118022ccb'
@@ -24,8 +24,8 @@ export function parseMetadata(html) {
   let data;
   try { data = JSON.parse(nodes[0].textContent); }
   catch (_) { throw new KioskError('INCOMPATIBLE', 'Métadonnées Kiosk illisibles.'); }
-  if (!data || typeof data.version !== 'string' || data.version.replace(/^v/, '') !== '0.44.1') {
-    throw new KioskError('INCOMPATIBLE', 'Version Kiosk non validée. Contrat pris en charge : v0.44.1.');
+  if (!data || typeof data !== 'object' || Array.isArray(data) || typeof data.version !== 'string' || !data.version.trim()) {
+    throw new KioskError('INCOMPATIBLE', 'Métadonnées Kiosk incompatibles : version absente ou invalide.');
   }
   return { version: data.version };
 }

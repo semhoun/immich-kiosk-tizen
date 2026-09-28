@@ -9,6 +9,7 @@ const root = await readFile(new URL('./fixtures/root.html', import.meta.url), 'u
 const photo = await readFile(new URL('./fixtures/photo.html', import.meta.url), 'utf8');
 const png = Buffer.from(photo.match(/base64,([^"]+)/)[1], 'base64');
 let mode = 'data';
+let serverVersion = 'v0.44.1';
 let stolen = 0;
 let assetCalls = 0;
 let actualCalls = 0;
@@ -58,7 +59,7 @@ const kiosk = await server(async (req, res) => {
     return;
   }
   if (url.pathname === '/base/') {
-    res.setHeader('Content-Type', 'text/html'); res.end(root); return;
+    res.setHeader('Content-Type', 'text/html'); res.end(root.replace(/v0\.44\.1/g, serverVersion)); return;
   }
   if (url.pathname === '/base/asset/new') {
     assetCalls++;
@@ -135,17 +136,34 @@ try {
     for (const html of ['', '<div class="frame"></div>', '<div class="frame frame-error">x</div>', '<video></video>']) {
       try { parsePhoto(html); } catch (error) { codes.push(error.code); }
     }
-    let unsupported;
-    try { parseMetadata(root.replace(/v0\.44\.1/g, 'v99.0.0')); } catch (error) { unsupported = error.code; }
-    return { source, version, codes, unsupported, compromised: Boolean(window.compromised) };
+    const versions = ['0.44.1', 'v0.45.0', 'v99.0.0', 'dev-build'].map(value =>
+      parseMetadata(root.replace(/v0\.44\.1/g, value)).version);
+    const invalidMetadata = ['', root + root, '<script id="kiosk-data">{</script>',
+      ...[null, [], 'v0.44.1', {}, { version: 44 }, { version: '' }, { version: '  ' }]
+        .map(value => `<script id="kiosk-data">${JSON.stringify(value)}</script>`)];
+    const metadataCodes = invalidMetadata.map(html => {
+      try { parseMetadata(html); return 'ACCEPTED'; } catch (error) { return error.code; }
+    });
+    return { source, version, codes, versions, metadataCodes, compromised: Boolean(window.compromised) };
   }, { root, photo, trap: trap.origin });
   assert.ok(parsed.source.startsWith('data:image/png;'));
   assert.equal(parsed.version, 'v0.44.1');
   assert.equal(parsed.compromised, false);
   assert.deepEqual(parsed.codes, Array(4).fill('INCOMPATIBLE'));
-  assert.equal(parsed.unsupported, 'INCOMPATIBLE');
+  assert.deepEqual(parsed.versions, ['0.44.1', 'v0.45.0', 'v99.0.0', 'dev-build']);
+  assert.deepEqual(parsed.metadataCodes, Array(10).fill('INCOMPATIBLE'));
   assert.equal(stolen, 0);
-  console.log('PASS inert parsing, exact contract and malicious markup');
+  console.log('PASS inert parsing, version-independent metadata contract and malicious markup');
+
+  for (const version of ['0.44.1', 'v0.45.0', 'v99.0.0', 'dev-build']) {
+    serverVersion = version;
+    for (const [scenario, expected] of [['data', 'OK'], ['video', 'INCOMPATIBLE'], ['broken', 'IMAGE']]) {
+      mode = scenario;
+      await makeClient();
+      assert.equal(await load(), expected, `${version}: ${scenario}`);
+    }
+  }
+  serverVersion = 'v0.44.1';
 
   for (const password of ['', 'test-secret']) {
     mode = 'data';

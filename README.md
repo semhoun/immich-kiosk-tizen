@@ -6,9 +6,9 @@
 
 Cette application Web embarquée cible **Tizen 5.5 / Chromium 69**. Elle communique avec Immich Kiosk, jamais directement avec Immich : le serveur Kiosk conserve la sélection des photos et la clé API Immich. Aucun backend supplémentaire n'est fourni.
 
-La version actuelle est **0.9.3**. Les lecteurs locaux acceptent uniquement le contrat **Kiosk v0.44.1**, étudié au commit `d567ac041fc93c3d5421aecdcdf5941118022ccb`. Le mode Full affiche le site original sans passer par cet adaptateur.
+Les lecteurs locaux vérifient le format des réponses Kiosk, sans blocage ni avertissement selon le numéro de version. Leur référence de développement est **Kiosk v0.44.1**, étudié au commit `d567ac041fc93c3d5421aecdcdf5941118022ccb` ; cela ne garantit pas la compatibilité avec toutes les versions. Le mode Full affiche le site original sans passer par cet adaptateur.
 
-**La compatibilité matérielle Tizen 5.5 et l'intégration complète avec un serveur réel restent à valider.** L'historique du projet rapporte une installation de la version 1.0.1 depuis Windows et une signature dans Docker. Il ne valide pas la version actuelle sur TV, ni l'installation directe depuis Docker. Une ancienne installation `1.0.x` peut empêcher la rétrogradation vers `0.9.3` ; sa désinstallation efface les réglages locaux.
+**Validation sur TV réelle confirmée par l'utilisateur le 28 septembre 2026 :** modes Simple, Enrichi et Full, navigation à la télécommande, veille/reprise et installation depuis Docker. Le modèle de TV, le firmware, la version de l'application testée et la version du serveur Kiosk n'ont pas été précisés ; ce résultat ne garantit pas la compatibilité avec tous les modèles Samsung ni l'endurance sur une longue durée.
 
 ## Fonctionnalités
 
@@ -48,7 +48,7 @@ Il n'y a pas de routeur : l'interface alterne entre réglages et lecture. Full u
 app/                      Interface et fichiers embarqués du widget
   main.js                 Coordination, télécommande et cycle de vie
   settings.js             Validation et persistance des réglages
-  kiosk.js                Adaptateur du contrat Kiosk v0.44.1
+  kiosk.js                Adaptateur et validation des réponses Kiosk
   network.js              Requêtes bornées et validation des destinations
   player.js               Lecture, historique, préchargement et reprise
   presentation.js         Horloge, date et présentation enrichie
@@ -69,7 +69,7 @@ artifacts/                Widgets et captures générés, non versionnés
 ### Prérequis
 
 - Docker Engine et Docker Compose fonctionnels, avec accès au daemon et prise en charge des contextes de build supplémentaires.
-- Un serveur Immich Kiosk accessible depuis le navigateur ou la TV ; v0.44.1 pour Simple et Enrichi.
+- Un serveur Immich Kiosk accessible depuis le navigateur ou la TV. Simple et Enrichi exigent une page HTML avec un unique `script#kiosk-data` contenant un objet JSON avec une version textuelle non vide, ainsi que la route `POST /asset/new` renvoyant une photo dans `.frame .frame--image > img`. Les réponses et les images restent validées à chaque chargement.
 - Pour installer sur TV : outils officiels, licences acceptées, profil Samsung compatible et mode développeur activé.
 
 **Tout l'outillage s'exécute dans Docker.** Ne pas installer Node.js, Playwright, Java, le SDK ou SDB sur l'hôte. Aucun conteneur privilégié ni montage du socket Docker n'est nécessaire.
@@ -267,9 +267,9 @@ docker compose run --rm --no-deps --volume /signing --volume /certificates --ent
 
 ## Licence et références
 
-Aucune licence globale du projet n'est spécifiée. Cette adaptation Tizen n'est pas une application officielle d'Immich Kiosk.
+Ce projet est distribué sous [licence GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`). Copyright (c) 2026 les contributeurs d'Immich Kiosk Tizen. Les dépendances tierces conservent leurs licences et attributions respectives. Cette adaptation Tizen n'est pas une application officielle d'Immich Kiosk.
 
-Le logo provient sans modification de [`assets/logo.svg` d'Immich Kiosk v0.44.1](https://github.com/damongolding/immich-kiosk/blob/v0.44.1/assets/logo.svg). Sa source est conservée dans [app/icon.svg](app/icon.svg), avec la [licence AGPL-3.0 amont](app/immich-kiosk-logo.LICENSE.txt). L'icône PNG 117 × 117 a été convertie le 28 septembre 2026 ; la régénérer avec `docker compose run --rm tooling npm run icon`.
+Le logo provient sans modification de [`assets/logo.svg` d'Immich Kiosk v0.44.1](https://github.com/damongolding/immich-kiosk/blob/v0.44.1/assets/logo.svg). Sa source est conservée dans [app/icon.svg](app/icon.svg), avec la [licence AGPL-3.0 amont](app/immich-kiosk-logo.LICENSE.txt), également applicable à sa conversion PNG. L'icône PNG 117 × 117 a été convertie le 28 septembre 2026 ; la régénérer avec `docker compose run --rm tooling npm run icon`.
 
 - [Documentation Immich Kiosk](https://docs.immichkiosk.app/)
 - [Sources Kiosk v0.44.1](https://github.com/damongolding/immich-kiosk/tree/v0.44.1)
