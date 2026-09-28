@@ -95,7 +95,7 @@ const app = await server(async (req, res) => {
   if (!/^[\w.-]+$/.test(file)) { res.writeHead(404); res.end(); return; }
   try {
     const content = await readFile(new URL(`../dist/${file}`, import.meta.url));
-    res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
+    res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.svg') ? 'image/svg+xml' : file.endsWith('.png') ? 'image/png' : 'text/html');
     // Mask the unsupported global in application modules, not in Playwright's
     // own runtime, which requires it even when evaluating a test expression.
     const classic = file === 'main.js' || file === 'startup.js';
@@ -215,6 +215,11 @@ try {
   await page.goto(app.origin);
   await page.locator('#url-activate').waitFor();
   await page.locator('#mode:focus').waitFor();
+  const logo = await page.locator('#app-logo').evaluate(async image => { await image.decode(); return { width: image.naturalWidth, height: image.naturalHeight }; });
+  assert.deepEqual(logo, { width: 483, height: 483 });
+  const icon = await readFile(new URL('../app/icon.png', import.meta.url));
+  assert.equal(icon.readUInt32BE(16), 117);
+  assert.equal(icon.readUInt32BE(20), 117);
   const manifest = await readFile(new URL('../app/config.xml', import.meta.url), 'utf8');
   const version = manifest.match(/<widget\b[^>]*\bversion="([^"]+)"/)[1];
   assert.equal(await page.locator('#app-version').textContent(), `Version ${version}`);

@@ -4,6 +4,9 @@ body { margin: 0; }
 [hidden] { display: none !important; }
 .settings { min-height: 100vh; display: grid; grid-template-columns: 0.85fr 1.6fr; column-gap: 6vw; padding: 5vh 6vw; align-items: center; }
 header { border-left: 5px solid #81aaff; padding-left: 28px; }
+.brand { display: flex; align-items: center; }
+.brand img { flex-shrink: 0; margin-right: 18px; }
+.brand .eyebrow { margin: 0; }
 .eyebrow { letter-spacing: 0.24em; font-size: 18px; color: #adc4ed; }
 h1 { font-family: Georgia, serif; font-weight: normal; font-size: 64px; font-size: clamp(40px, 4.1vw, 80px); line-height: 1.1; margin: 28px 0; }
 header > p:not(.eyebrow) { color: #bdc8da; font-size: 22px; line-height: 1.6; }

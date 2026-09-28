@@ -56,28 +56,6 @@ services:
     <<: *tizen
     profiles: [tizen-host]
     network_mode: host
-  certificate-ui:
-    image: immich-kiosk-tizen-certificates:local
-    profiles: [certificates]
-    build:
-      context: .
-      dockerfile: Dockerfile.certificates
-      args:
-        TIZEN_ACCEPT_LICENSE: ${TIZEN_ACCEPT_LICENSE:-no}
-    environment:
-      LOCAL_UID: ${LOCAL_UID:-1000}
-      LOCAL_GID: ${LOCAL_GID:-1000}
-    ports: ["127.0.0.1:${CERTIFICATE_UI_PORT:-6080}:6080"]
-    networks: [certificate_gui]
-    volumes:
-      - signing:/signing
-      - .:/workspace:ro
-    shm_size: 1gb
-    security_opt: ["no-new-privileges:true"]
-
-networks:
-  certificate_gui:
-
 volumes:
   dependencies:
   cache:

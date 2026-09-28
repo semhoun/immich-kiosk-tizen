@@ -1,340 +1,275 @@
 # Immich Kiosk pour Tizen
 
-Application Web locale pour afficher les photos d'un serveur Immich Kiosk sur une télévision Samsung ciblant **Tizen 5.5 / Chromium 69**. Le widget utilise un script classique compilé pour Chromium 69, sans dépendre du chargement des modules natifs. Le manifeste exige Tizen 5.5 minimum. La version du paquet est affichée dans les réglages, automatiquement à partir de `app/config.xml`.
+> Afficher les photos d'un serveur Immich Kiosk sur une télévision Samsung, avec une interface française adaptée à la télécommande.
 
-L'application ne contacte pas directement Immich : Kiosk conserve la sélection des photos et la clé API Immich. Les modes Simple et Enrichi utilisent un lecteur local, sans exécuter le HTML ou les scripts distants. Le mode Full affiche le site original dans une iframe isolée, après confirmation.
+## Présentation
 
-## État du projet
+Cette application Web embarquée cible **Tizen 5.5 / Chromium 69**. Elle communique avec Immich Kiosk, jamais directement avec Immich : le serveur Kiosk conserve la sélection des photos et la clé API Immich. Aucun backend supplémentaire n'est fourni.
 
-- Lecteur et interface de configuration implémentés en HTML, CSS et JavaScript, sans framework.
-- Contrat Kiosk **v0.44.1** étudié au commit `d567ac041fc93c3d5421aecdcdf5941118022ccb`, avec fixtures synthétiques et anonymisées. Les autres versions sont refusées explicitement par les lecteurs locaux ; Full ne passe pas par cet adaptateur.
-- Tests exécutés dans Docker avec Node **22.14.0**, Playwright **1.51.1** et Chromium **134**. Le test navigateur masque `globalThis` dans les modules applicatifs pour couvrir son absence sur Chromium 69 ; cela ne remplace pas le moteur réel de la TV.
-- Dernière validation : **29 tests unitaires et 14 groupes de tests navigateur réussis**, incluant la navigation entre colonnes, les contrôles masqués en Full, les codes numériques Samsung, les événements IME Terminé/Annuler et l'affichage temporaire du mot de passe sur le script compilé.
-- SDK CLI et Certificate Manager lancés dans Docker, extension Samsung Certificate **2.0.75** vérifiée. Les certificats créés manuellement ont été importés et les paquets signés dans Docker. L'utilisateur a confirmé l'installation de la version 1.0.1 depuis Windows ; la correction de saisie 1.0.2 reste à valider sur TV. La création de certificats via la connexion Samsung du bureau Docker n'a pas été validée de bout en bout.
-- Des sondes HTTPS/CORS de diagnostic ont été réalisées, mais l'intégration complète avec le serveur réel et les essais sur TV restent à effectuer. La compatibilité matérielle Tizen 5.5 n'est pas validée.
+La version actuelle est **0.9.3**. Les lecteurs locaux acceptent uniquement le contrat **Kiosk v0.44.1**, étudié au commit `d567ac041fc93c3d5421aecdcdf5941118022ccb`. Le mode Full affiche le site original sans passer par cet adaptateur.
 
-**Le fichier `artifacts/immich-kiosk-UNSIGNED.wgt` est une archive de test non signée, pas un paquet prêt à installer sur TV.**
+**La compatibilité matérielle Tizen 5.5 et l'intégration complète avec un serveur réel restent à valider.** L'historique du projet rapporte une installation de la version 1.0.1 depuis Windows et une signature dans Docker. Il ne valide pas la version actuelle sur TV, ni l'installation directe depuis Docker. Une ancienne installation `1.0.x` peut empêcher la rétrogradation vers `0.9.3` ; sa désinstallation efface les réglages locaux.
 
 ## Fonctionnalités
 
-- Trois présentations mémorisées : Simple, Enrichi et Full.
-- Photos plein écran, affichage contenir ou remplir, durée locale de 15 secondes par défaut.
-- Précédent, suivant et pause/reprise ; historique borné à 10 photos et une photo préchargée.
-- Remplacement de la photo seulement après décodage réussi.
-- Réglages en français, focus visible et navigation directionnelle.
-- URL HTTP(S) configurable, chemins de base et paramètres répétés conservés.
-- Mot de passe Kiosk facultatif, envoyé dans l'en-tête `X-Api-Key` en Simple/Enrichi et dans le paramètre d'URL `password` en Full.
-- Mémorisation du mot de passe désactivée par défaut ; suppression du secret enregistré dès que la case est décochée.
-- Affichage temporaire du mot de passe sur demande, non mémorisé et automatiquement masqué à la sortie des réglages ou en arrière-plan.
-- Requêtes annulables, délais bornés, trois relances réseau maximum et suspension en arrière-plan.
-- Dernière photo conservée en cas d'erreur transitoire ; aucune relance automatique après une erreur d'authentification observable.
-
-Les lecteurs locaux ne gèrent pas les vidéos ni la météo. Le fonctionnement hors ligne, le démarrage à l'allumage de la TV, l'authentification Basic et les portails d'authentification externes sont hors périmètre. Full délègue la présentation au site distant, sans garantir ses fonctionnalités sur TV. Aucune publication Samsung Store n'est prévue dans cette livraison.
-
-## Choix de présentation
-
-Le sélecteur **Présentation** propose trois modes. Les réglages enregistrés avant son ajout utilisent automatiquement Simple.
-
-| Mode | Présentation | Authentification |
+| Mode | Présentation | Authentification Kiosk |
 | --- | --- | --- |
-| Simple | Photos seules, lecteur local et commandes de télécommande | Mot de passe par `X-Api-Key` |
-| Enrichi | Même lecteur, avec horloge, date française et apparition en fondu | Mot de passe par `X-Api-Key` |
-| Full | Site Kiosk original dans un cadre isolé, disposition et rythme natifs | Mot de passe dans l'URL du cadre, après confirmation |
+| Simple | Photos plein écran, lecteur local | En-tête `X-Api-Key` |
+| Enrichi | Lecteur local, horloge, date française et fondu conditionnel | En-tête `X-Api-Key` |
+| Full | Site original dans une iframe isolée, rythme et disposition du serveur | Paramètre d'URL `password` |
 
-### Enrichi
+- Durée locale de 15 secondes par défaut, ajustement contenir ou remplir.
+- Précédent, suivant, pause/reprise, historique limité à 10 photos et une photo préchargée.
+- Remplacement de l'image uniquement après décodage réussi ; dernière photo conservée lors d'une erreur transitoire.
+- Requêtes annulables, délais bornés, trois relances réseau maximum et suspension en arrière-plan.
+- URL HTTP(S), chemins de base et filtres répétés ; mot de passe facultatif, non mémorisé par défaut.
+- Réglages persistants, démarrage automatique après configuration et affichage temporaire du mot de passe.
 
-L'heure et la date proviennent de l'appareil qui exécute l'application, dans son fuseau horaire. L'horloge est actualisée à chaque minute et suspendue en arrière-plan. Le fondu est activé seulement si le navigateur reconnaît la préférence système et indique qu'aucune réduction des animations n'est demandée ; il reste désactivé sur Chromium 69. Le lecteur conserve les mêmes filtres, historique et commandes que Simple.
+Les modes locaux ne lisent ni vidéos ni météo. Le fonctionnement hors ligne, le lancement à l'allumage, l'authentification Basic et les portails externes sont hors périmètre. Aucune publication Samsung Store n'est prévue.
 
-Il ne s'agit pas d'une reproduction complète de Kiosk : la météo, les informations détaillées sur les photos et les dispositions multiples ne sont pas ajoutées au lecteur local.
+## Technologies
 
-### Full
+| Couche | Technologie |
+| --- | --- |
+| Application | HTML, CSS et JavaScript natifs, sans framework ni dépendance npm d'exécution |
+| État et stockage | Modules JavaScript, `localStorage`, historique en mémoire et URL Blob |
+| Intégration TV | Manifeste Tizen 5.5, touches Tizen, API Samsung AppCommon |
+| Construction | Node.js 22.14.0, esbuild 0.25.1, bundle classique ciblant Chromium 69 |
+| Tests | Runner natif Node.js, Playwright 1.51.1, fixtures HTTP/HTTPS synthétiques |
+| Outillage | Docker Compose et SDK Tizen CLI |
 
-Full conserve les paramètres de l'URL, sans imposer `layout=single` ou les options photos uniquement. **Durée par photo**, **Affichage** et **Lancer le diaporama** sont masqués dans ce mode : le site Kiosk gère ses propres réglages. Le lancement manuel utilise **Ouvrir le site Full** et demande une confirmation. En revenant à Simple ou Enrichi, les contrôles locaux réapparaissent avec leurs valeurs conservées. Une fois les réglages enregistrés, Full démarre automatiquement au rechargement de l'application, sans nouvelle confirmation en HTTPS. Un mot de passe nécessaire au démarrage doit être mémorisé via la case dédiée. En HTTP avec mot de passe, la confirmation reste obligatoire avant l'envoi du secret.
+## Architecture
 
-Full utilise l'authentification native `?password=...` de Kiosk : une iframe ne peut pas joindre `X-Api-Key` à sa navigation. Le mot de passe peut être saisi dans son champ ou fourni dans l'URL collée. Il est extrait de l'adresse des réglages, puis ajouté avec un encodage adapté uniquement à l'URL du cadre au lancement. Les paramètres répétés et la disposition Kiosk sont conservés.
+`main.js` coordonne les réglages, le focus, les touches et le cycle de vie. Pour Simple et Enrichi, les données suivent le parcours `KioskClient` → `Player` → affichage local. L'adaptateur analyse du HTML inerte, télécharge les images autorisées et fournit des URL Blob au lecteur. `Player` gère l'historique, le préchargement et les relances ; les réglages sont stockés séparément.
 
-**Cette exception est limitée à Full.** La confirmation de lancement manuel rappelle que le secret peut apparaître dans les journaux du serveur ou du proxy et les données du navigateur, même en HTTPS. En HTTP, elle avertit également de l'absence de chiffrement. Aucun chargement du cadre ne démarre en cas d'annulation. L'application n'enregistre pas l'URL contenant le secret ; le champ mot de passe reste soumis à la case de mémorisation. Le démarrage automatique HTTPS utilise les réglages précédemment confirmés ; recharger le cadre ou reprendre après arrière-plan réutilise l'autorisation de la session en cours. Simple et Enrichi continuent d'utiliser l'en-tête, sans secret dans les URL.
+Il n'y a pas de routeur : l'interface alterne entre réglages et lecture. Full utilise un composant distinct et ne partage pas le pipeline photo local. La construction remplace les modules sources par un script classique et injecte la version de `app/config.xml` dans l'interface.
 
-Le cadre Full occupe tout l'écran, sans bandeau ni boutons locaux. Il est réservé à la lecture autonome : il ne reçoit ni les clics ni le focus clavier. Les commandes locales précédent/suivant/pause ne contrôlent pas Kiosk. **Haut** ou **Retour** ouvrent les réglages ; relancer le mode recharge le site. Le cadre est supprimé en arrière-plan ou à la sortie ; au retour, le site est rechargé et son état de lecture peut être réinitialisé.
+```text
+app/                      Interface et fichiers embarqués du widget
+  main.js                 Coordination, télécommande et cycle de vie
+  settings.js             Validation et persistance des réglages
+  kiosk.js                Adaptateur du contrat Kiosk v0.44.1
+  network.js              Requêtes bornées et validation des destinations
+  player.js               Lecture, historique, préchargement et reprise
+  presentation.js         Horloge, date et présentation enrichie
+  full.js                 Intégration isolée du site original
+  config.xml              Identité, version et privilèges Tizen
+tests/                    Tests unitaires, navigateur et profil de signature
+  fixtures/               Réponses Kiosk synthétiques et anonymisées
+tools/                    Construction, serveur local, icône et commandes SDK
+Dockerfile                Environnement Node.js et Playwright
+Dockerfile.tizen           SDK CLI avec installateur externe
+compose.yaml              Services, profils et volumes
+dist/                     Application construite, non versionnée
+artifacts/                Widgets et captures générés, non versionnés
+```
 
-Le site doit avoir une origine différente de l'application locale. Le sandbox autorise ses scripts et son origine, mais pas la navigation de la fenêtre principale, les fenêtres supplémentaires ou les formulaires. Le parent ne peut pas inspecter le résultat HTTP du cadre : un événement de chargement ne prouve ni l'authentification ni la lecture effective. Même si le cadre reste vide ou si le serveur refuse son affichage, Haut et Retour permettent de retrouver les réglages.
+## Démarrage
 
-Les en-têtes `X-Frame-Options` ou CSP `frame-ancestors` du serveur peuvent interdire l'intégration. Une page HTTPS ne peut pas nécessairement intégrer un site HTTP. Ses scripts, ressources, éventuels cookies et caches suivent le fonctionnement du site distant, contrairement aux modes locaux. Les essais sur le moteur réel de la TV restent à effectuer, comme indiqué dans l'état du projet.
+### Prérequis
 
-L'adaptation du widget à Tizen 5.5 ne transforme pas les scripts du site distant : elle concerne le lecteur et son interface locale. Pour vérifier d'abord ces derniers sur la TV, utiliser Simple ou Enrichi avant de tester Full.
+- Docker Engine et Docker Compose fonctionnels, avec accès au daemon et prise en charge des contextes de build supplémentaires.
+- Un serveur Immich Kiosk accessible depuis le navigateur ou la TV ; v0.44.1 pour Simple et Enrichi.
+- Pour installer sur TV : outils officiels, licences acceptées, profil Samsung compatible et mode développeur activé.
 
-## Prérequis
+**Tout l'outillage s'exécute dans Docker.** Ne pas installer Node.js, Playwright, Java, le SDK ou SDB sur l'hôte. Aucun conteneur privilégié ni montage du socket Docker n'est nécessaire.
 
-- Docker Engine et Docker Compose fonctionnels, avec accès au daemon.
-- Un serveur Immich Kiosk existant, accessible depuis le navigateur ou la TV.
-- Pour le déploiement uniquement : outillage officiel Tizen/Samsung, licences acceptées, profil de signature compatible avec la TV et mode développeur activé sur celle-ci.
+### Installation et aperçu
 
-**Tout l'outillage s'exécute dans Docker.** Ne pas installer Node, Playwright, Java, le SDK Tizen ou SDB sur l'hôte. Aucun conteneur privilégié ni montage du socket Docker n'est requis.
-
-Les commandes suivantes sont à exécuter depuis la racine du projet.
-
-## Démarrage rapide
+Depuis la racine de cette copie du dépôt :
 
 ```sh
 docker compose build tooling
 docker compose up dev
 ```
 
-Ouvrir <http://127.0.0.1:8080> depuis la machine de développement, ou `http://ADRESSE_IP_DE_LA_MACHINE:8080` depuis un autre appareil du réseau. Le port est publié sur toutes les interfaces IPv4 par défaut (`0.0.0.0`), sous réserve du pare-feu et du routage. Ce serveur de développement n'a pas d'authentification : le réserver à un réseau de confiance, sans exposition publique.
+La construction de l'image installe les dépendances avec `npm ci`. Ouvrir <http://127.0.0.1:8080>. Depuis un autre appareil, utiliser l'adresse IP de la machine et le port 8080. Le port est publié sur toutes les interfaces IPv4 par défaut : réserver ce serveur sans authentification à un réseau de confiance.
 
-L'aperçu construit puis sert `dist/`, avec le même script classique que le widget. Après une modification des sources, exécuter `docker compose run --rm tooling npm run build` puis recharger la page.
-
-L'aperçu réseau ne remplace pas l'installation du widget Tizen : l'application installée sur la TV exécutera ses fichiers embarqués. Pour restreindre à nouveau l'aperçu à la machine locale :
+L'aperçu construit puis sert `dist/`, comme le widget. Il n'effectue pas de reconstruction automatique. Après une modification, exécuter la commande suivante puis recharger la page :
 
 ```sh
-PREVIEW_HOST=127.0.0.1 docker compose up -d dev
+docker compose run --rm tooling npm run build
 ```
 
-Pour utiliser un autre port :
+Pour limiter l'accès à la machine locale ou changer le port :
 
 ```sh
-PREVIEW_PORT=8081 docker compose up dev
+PREVIEW_HOST=127.0.0.1 PREVIEW_PORT=8081 docker compose up dev
 ```
 
-Les outils s'exécutent avec les UID/GID `1000:1000` par défaut. Si nécessaire, définir `LOCAL_UID` et `LOCAL_GID` avec les identifiants de l'utilisateur hôte avant de lancer Compose. Les dépendances et caches sont conservés dans des volumes Docker.
+Les commandes utilisent les UID/GID `1000:1000`. Adapter `LOCAL_UID` et `LOCAL_GID` aux identifiants non-root de l'hôte si nécessaire. Les dépendances et caches persistent dans des volumes Docker ; reconstruire l'image `tooling` après modification des dépendances.
 
-## Configuration du lecteur
+### Configuration du lecteur
 
-La case **Afficher le mot de passe** révèle le texte dans le champ et sa zone de sélection. Elle est désactivée au démarrage et n'est jamais enregistrée. Elle se trouve sur la même ligne que **Mémoriser le mot de passe**, avec une navigation Gauche/Droite entre les deux cases. Les deux options sont indépendantes : mémoriser contrôle uniquement la conservation du secret entre les lancements.
-
-La version actuelle est **0.9.2**. Si une ancienne version de développement `1.0.x` est déjà installée, la TV peut refuser cette rétrogradation. Dans ce cas, une désinstallation préalable peut être nécessaire et effacera les réglages locaux de l'application.
-
-1. Choisir Simple ou Enrichi pour le lecteur local, puis saisir l'adresse du serveur Kiosk avec son éventuel préfixe et ses filtres, par exemple `https://kiosk.exemple.fr/cadre/?album=album-a&album=album-b`.
-2. Saisir le mot de passe natif Kiosk, si nécessaire.
-3. Choisir la durée et l'ajustement de l'image.
-4. Utiliser **Tester la connexion** pour vérifier les métadonnées, charger une photo et la décoder.
+1. Choisir Simple ou Enrichi, puis saisir l'URL du serveur Kiosk avec son éventuel chemin de base et ses filtres.
+2. Saisir le mot de passe natif Kiosk si nécessaire ; choisir explicitement s'il doit être mémorisé.
+3. Régler la durée et l'ajustement de l'image.
+4. Utiliser **Tester la connexion** : le test récupère les métadonnées, télécharge une photo et la décode.
 5. Utiliser **Lancer le diaporama**.
 
-Dans les modes locaux, un chemin sans slash final est traité comme un répertoire : `/cadre` devient `/cadre/`. Les ressources distantes doivent rester dans l'origine et le chemin de base autorisés ; les images pointant hors de ce périmètre sont refusées, sans réécriture implicite. Full charge directement l'adresse normalisée : le site original doit déjà fonctionner sous ce chemin.
+Un chemin local sans slash final est traité comme un répertoire. Les filtres répétés sont conservés. Le lecteur impose `layout=single`, désactive vidéos, live photos et GIF animés, demande les aperçus et retire `history`. Si `disable_url_queries` empêche ces options, les réponses incompatibles sont refusées.
 
-Les paramètres `password` et `authsecret` présents dans une URL sont extraits vers le champ secret et retirés de l'adresse affichée et enregistrée. Simple et Enrichi transmettent ensuite le secret par en-tête ; Full le remet dans le seul paramètre `password` de l'URL du cadre après confirmation. La mémorisation reste soumise à la case dédiée. Les identifiants intégrés sous la forme `https://utilisateur:motdepasse@serveur/` sont refusés.
+Les paramètres `password` et `authsecret` d'une URL collée sont extraits vers le champ secret, puis retirés de l'adresse enregistrée. Les URL contenant des identifiants utilisateur sont refusées. Décocher **Mémoriser le mot de passe** supprime immédiatement le secret persisté. **Afficher le mot de passe** est indépendant, non mémorisé et réinitialisé à la sortie des réglages ou en arrière-plan.
 
-Le lecteur demande `layout=single`, `show_videos=false`, `live_photos=false`, `show_animated_gifs=false` et des aperçus plutôt que les originaux. Le paramètre serveur `history` est retiré, car l'historique est géré localement. Si Kiosk désactive les paramètres d'URL avec `disable_url_queries`, ces demandes peuvent être ignorées : le lecteur refuse alors les réponses incompatibles plutôt que de contourner cette restriction.
-
-Si une configuration est enregistrée, l'application tente de démarrer le diaporama à son lancement. Un secret non mémorisé doit être saisi à nouveau après fermeture de l'application. **Effacer les réglages** supprime l'adresse et le mot de passe enregistrés.
+Une configuration enregistrée déclenche une tentative de lecture au lancement. Un secret non mémorisé doit être ressaisi. **Effacer les réglages** supprime l'adresse et le mot de passe enregistrés.
 
 ### Télécommande
 
-| Touche | Action |
+| Touche ou action | Comportement |
 | --- | --- |
-| Haut / bas dans les réglages | Déplacer le focus, y compris entre mot de passe et adresse hors composition IME |
-| Gauche / droite dans une rangée | Passer entre Durée et Affichage, ou entre les boutons, sans changer les valeurs |
+| Flèches dans les réglages | Déplacer le focus ; gauche/droite change de colonne sans modifier les valeurs |
 | OK sur un choix | Changer la présentation, la durée ou l'ajustement |
-| Focus sur un champ texte | Sélectionner le champ sans ouvrir le clavier |
-| OK ou clic sur un champ texte | Activer la saisie et ouvrir le clavier natif Samsung |
-| Terminé / Annuler du clavier TV | Fermer la saisie et revenir au champ sélectionné, clavier fermé |
-| Gauche / droite dans le diaporama | Photo précédente / suivante |
-| OK / Entrée dans le diaporama | Pause / reprise |
-| Touches média prises en charge | Lecture, pause ou bascule |
-| Haut dans le diaporama (Simple, Enrichi ou Full) | Ouvrir les réglages |
-| Retour pendant la saisie | Terminer la saisie |
-| Retour dans le diaporama | Ouvrir les réglages |
+| Focus sur un champ texte | Sélectionner sans ouvrir le clavier |
+| OK ou clic sur un champ texte | Ouvrir la saisie native Samsung |
+| Terminé, Annuler ou Retour pendant la saisie | Fermer la saisie et revenir au champ |
+| Gauche / droite en lecture locale | Photo précédente / suivante |
+| OK / Entrée ou touches média en lecture locale | Pause/reprise, lecture ou pause selon la touche |
+| Haut ou Retour en lecture, y compris Full | Ouvrir les réglages |
 | Retour dans les réglages | Demander confirmation de sortie |
 
-L'API Samsung de gestion de l'économiseur est utilisée si elle est disponible. Le comportement normal est rétabli à la pause, à l'arrêt ou en arrière-plan. Cela ne neutralise pas les protections matérielles de la dalle. Le clavier TV et les touches physiques restent à tester sur le modèle cible.
+AppCommon gère l'économiseur lorsque disponible, puis rétablit son comportement normal à la pause, à l'arrêt ou en arrière-plan. Les protections matérielles de la dalle restent actives. Le clavier et les touches physiques doivent être vérifiés sur le modèle cible.
+
+### Particularités des présentations
+
+Enrichi utilise l'heure et le fuseau de l'appareil, avec actualisation à la minute. Le fondu fonctionne uniquement si le navigateur reconnaît une préférence autorisant les animations ; il reste désactivé sur Chromium 69. Ce mode ne reproduit ni les dispositions multiples ni les informations photo détaillées de Kiosk.
+
+Full conserve les paramètres du site sans imposer les options du lecteur local. Les contrôles de durée, d'ajustement et de lancement local sont masqués. **Ouvrir le site Full** demande confirmation. Une configuration enregistrée peut redémarrer automatiquement en HTTPS ; en HTTP avec mot de passe, la confirmation reste obligatoire.
+
+Le cadre Full est non interactif : ni clics, ni focus clavier, ni contrôle local précédent/suivant/pause. Haut et Retour restent disponibles. Le cadre est supprimé en arrière-plan puis rechargé au retour, ce qui peut réinitialiser la lecture distante.
 
 ## Réseau et sécurité
 
-Dans les modes Simple et Enrichi, les fragments Kiosk sont analysés dans un contenu HTML inerte, jamais injectés dans le document actif. Seules des images raster autorisées sont extraites. Les réponses HTML sont bornées à 24 Mio et les images à 16 Mio. Les formats acceptés sont JPEG, PNG et WebP, sous réserve de décodage par le moteur réel. Ces contrôles d'adaptateur ne s'appliquent pas au site distant autonome en Full.
-
-Dans les lecteurs locaux, les images distantes sont récupérées avec authentification puis affichées à partir d'URL Blob. Les redirections sont refusées et le secret n'est pas transmis à une origine tierce. Les URL Blob sont libérées à l'éviction ; aucun cache disque de photos n'est implémenté.
-
-HTTP n'offre aucune confidentialité. Une confirmation est demandée avant la première connexion HTTP avec secret pour l'adresse concernée durant la session. HTTPS requiert un certificat reconnu par le client ; aucun contournement des erreurs TLS n'est prévu. Le stockage local du mot de passe n'est pas un coffre-fort. Ne pas exposer Kiosk publiquement en se reposant uniquement sur son mot de passe natif.
+- Simple et Enrichi n'exécutent jamais les fragments HTML distants. Les images JPEG, PNG et WebP sont validées puis décodées ; les réponses sont limitées à 24 Mio, les images à 16 Mio.
+- Les téléchargements locaux refusent les redirections et les images hors de l'origine ou du chemin de base autorisés. Les URL Blob sont libérées à l'éviction ; aucun cache disque photo n'est implémenté.
+- HTTP ne chiffre rien. Une confirmation précède l'envoi d'un secret en HTTP. HTTPS exige un certificat reconnu, sans contournement TLS.
+- Le mot de passe mémorisé réside dans `localStorage`, sans chiffrement. Ne pas considérer ce stockage comme un coffre-fort ni exposer Kiosk sur la seule protection de son mot de passe natif.
+- Full place le secret dans l'URL du cadre, car une iframe ne peut pas ajouter `X-Api-Key` à sa navigation. Même en HTTPS, cette URL peut apparaître dans les journaux serveur/proxy ou les données du navigateur. L'application ne la persiste pas.
+- Full exige une origine différente de celle de l'application. Son sandbox autorise les scripts et l'origine distante, mais pas les formulaires, fenêtres supplémentaires ou navigation de la fenêtre principale.
+- `X-Frame-Options`, CSP `frame-ancestors` ou le contenu mixte peuvent bloquer Full. Un chargement du cadre ne prouve ni l'authentification ni la lecture effective. Ses scripts ne sont pas adaptés à Chromium 69 par la construction locale.
 
 ### Limite CORS de Kiosk v0.44.1
 
-Cette limite concerne les appels de l'adaptateur local en Simple et Enrichi. La navigation du cadre Full ne nécessite pas CORS, mais reste soumise à l'authentification et aux restrictions d'intégration du site.
+Simple et Enrichi envoient `kiosk-device-id`, ainsi que `X-Api-Key` si un mot de passe existe. Ces en-têtes nécessitent une prérequête CORS. Dans le contrat étudié, l'authentification précède le middleware CORS : `OPTIONS` peut recevoir un `401` sans en-têtes CORS. **Configurer uniquement `allowed_origins` ne corrige pas cet ordre.**
 
-Le code source de cette version enregistre l'authentification avant le middleware CORS. Avec un mot de passe, la requête préliminaire `OPTIONS` nécessaire à `X-Api-Key` peut donc recevoir un `401` avant l'ajout des en-têtes CORS. **Configurer uniquement `allowed_origins` ne suffit pas à corriger cet ordre des middlewares.**
+Ce cas est couvert par un serveur simulé, pas validé sur le déploiement réel. Observer l'origine Tizen et les prérequêtes sur TV ; ses privilèges ne garantissent aucun contournement CORS. Le projet n'ajoute pas de proxy et ne modifie pas Kiosk. Ne pas désactiver l'authentification ou ouvrir globalement CORS. Full ne requiert pas CORS pour la navigation, mais reste soumis aux restrictions d'intégration.
 
-Le lecteur transmet également un identifiant aléatoire `kiosk-device-id` pour isoler le cache de préchargement entre configurations. Cet en-tête nécessite lui aussi une autorisation CORS, même sans mot de passe.
-
-Cette limite a été identifiée dans les sources et reproduite avec un serveur simulé, pas vérifiée sur le serveur de l'utilisateur. Un reverse proxy existant peut modifier le comportement. L'origine réelle de l'application Tizen et les requêtes préliminaires doivent être observées sur TV. Les privilèges Tizen ne doivent pas être considérés comme un contournement de CORS.
-
-Aucun proxy n'est ajouté et aucune configuration serveur n'est modifiée par ce projet. Ne pas désactiver l'authentification ou élargir globalement CORS pour contourner le problème. Une erreur réseau du navigateur ne permet pas toujours de distinguer CORS, TLS, redirection ou serveur inaccessible.
-
-## Tests et construction
+## Tests et captures
 
 ```sh
 docker compose config --quiet
 docker compose run --rm tooling npm test
 docker compose run --rm browser
+```
+
+La suite comprend **7 fichiers unitaires, avec 29 cas déclarés**, et un scénario navigateur autonome. Elle couvre réglages, secrets, protocole, historique, relances, réponses obsolètes, parsing malveillant, destinations tierces et parcours clavier. Les serveurs HTTP/HTTPS et les photos sont synthétiques. Une autorité temporaire est approuvée uniquement par le navigateur de test ; les certificats non fiables restent refusés.
+
+Playwright utilise Chromium 134, avec `globalThis` masqué dans les modules applicatifs pour simuler son absence sur Chromium 69. Cela ne remplace pas le moteur réel, une intégration Kiosk ou un essai mémoire prolongé sur TV. L'ancien suivi rapportait 29 tests unitaires et 14 groupes navigateur réussis ; ce n'est pas une validation de chaque modification ultérieure.
+
+Les tests navigateur génèrent `artifacts/settings-desktop.png`, `settings-mobile.png`, `enriched-desktop.png` et `full-desktop.png`. Ces captures ne sont pas versionnées ; les deux dernières montrent des fixtures.
+
+## Construction
+
+```sh
 docker compose run --rm tooling npm run build
 docker compose run --rm tooling npm run package:unsigned
 ```
 
-`package:unsigned` reconstruit également les fichiers de l'application avant de créer l'archive.
+`build` produit `dist/`. `package:unsigned` reconstruit l'application et crée `artifacts/immich-kiosk-UNSIGNED.wgt`. **Cette archive non signée n'est pas installable telle quelle sur TV.** La construction refuse liens symboliques, fichiers cachés et extensions privées dans `app/`.
 
-| Sortie | Description |
-| --- | --- |
-| `dist/` | Fichiers Web et manifeste Tizen |
-| `artifacts/immich-kiosk-UNSIGNED.wgt` | Archive non signée |
-| `artifacts/signed/ImmichKiosk.wgt` | Paquet signé avec nom sans espace, à utiliser pour l'installation TV |
-| `artifacts/settings-desktop.png` | Capture de l'interface grand écran, générée par les tests navigateur |
-| `artifacts/settings-mobile.png` | Capture de l'interface mobile, générée par les tests navigateur |
-| `artifacts/enriched-desktop.png` | Capture du lecteur Enrichi sur fixture de test |
-| `artifacts/full-desktop.png` | Capture du cadre Full avec site original simulé |
+## Signature et déploiement Tizen
 
-Les tests couvrent les réglages et secrets, le protocole, les filtres répétés, l'historique, les réponses obsolètes, la pause, les relances, le parsing malveillant, les destinations tierces et les parcours clavier. La matrice HTTP/HTTPS utilise des serveurs locaux simulés. Une autorité de certification temporaire est approuvée uniquement par le navigateur de test ; les certificats non fiables restent refusés, sans option de contournement TLS.
+### Environnement SDK
 
-Ces tests ne remplacent pas une validation Chromium 69/Tizen, un essai prolongé de mémoire sur TV ou une intégration avec un vrai serveur Kiosk.
-
-## Signature et installation Tizen
-
-La signature dans Docker a été vérifiée avec des certificats réels. L'installation directe depuis le conteneur sur la TV reste à valider ; l'installation confirmée a été effectuée depuis Windows. Cette procédure exige un installateur officiel, les extensions Samsung nécessaires et un profil de signature. Le profil peut être importé ou créé dans l'interface Docker décrite ci-dessous. La connexion Samsung, les mots de passe des certificats et les éventuelles validations à deux facteurs restent à effectuer manuellement dans l'outil officiel.
-
-### Configuration de l'environnement
-
-Définir les variables suivantes dans l'environnement utilisé par Compose. Garder l'installateur, les certificats et les secrets hors du projet.
+Conserver installateur, certificats et secrets hors du dépôt. Définir ces variables dans l'environnement Compose :
 
 | Variable | Valeur attendue |
 | --- | --- |
-| `TIZEN_INSTALLER_DIR` | Dossier externe dédié contenant uniquement `web-cli_Tizen_Studio_6.1_ubuntu-64.bin` |
+| `TIZEN_INSTALLER_DIR` | Dossier dédié contenant uniquement `web-cli_Tizen_Studio_6.1_ubuntu-64.bin` |
 | `TIZEN_INSTALLER_SHA256` | Empreinte SHA-256 vérifiée de cet installateur |
-| `TIZEN_ACCEPT_LICENSE` | `yes`, uniquement après acceptation des conditions applicables |
-| `TIZEN_PACKAGES` | Identifiants vérifiés des paquets à installer ; valeur par défaut `WebCLI` |
-| `TIZEN_CERTIFICATES_DIR` | Dossier externe contenant les certificats et `profiles.xml` |
+| `TIZEN_ACCEPT_LICENSE` | `yes`, uniquement après acceptation des licences applicables |
+| `TIZEN_PACKAGES` | Identifiants de paquets vérifiés ; défaut : `WebCLI` |
+| `TIZEN_CERTIFICATES_DIR` | Dossier privé externe, monté en lecture seule dans `/certificates` |
 
-L'installateur est transmis comme contexte de build séparé et monté en lecture seule, sans être copié dans une couche de l'image. Un secret BuildKit ne convient pas à ce fichier de 280 Mo (limite de 500 Kio). L'ancien paramètre `TIZEN_INSTALLER_FILE` est remplacé par `TIZEN_INSTALLER_DIR`. Ne pas utiliser un dossier contenant des certificats ou d'autres secrets comme contexte d'installateur.
-
-Les certificats externes sont montés en lecture seule dans `/certificates` si `TIZEN_CERTIFICATES_DIR` est défini. Sinon, un volume d'import vide est utilisé ; les commandes de diagnostic n'exigent donc pas de certificats préexistants. Le profil importé et l'état de signature sont conservés dans le volume privé `signing`. Les profils externes doivent référencer `/certificates/...`, tandis que ceux créés dans l'interface Docker utilisent les chemins du volume privé.
-
-`WebCLI` seul ne garantit pas la présence des extensions Samsung TV et Certificate. Vérifier les paquets et leurs licences officielles avant utilisation. La documentation Samsung exige une extension Certificate au moins **2.0.73** depuis septembre 2025.
-
-### Création interactive dans Docker
-
-Après configuration de l'installateur et acceptation des licences :
+L'installateur utilise un contexte de build séparé et un montage en lecture seule, sans copie dans une couche. `TIZEN_INSTALLER_DIR` remplace l'ancien `TIZEN_INSTALLER_FILE`. Sans dossier de certificats, un volume d'import vide permet les diagnostics. `WebCLI` seul ne garantit pas les extensions Samsung TV et Certificate ; vérifier leurs licences et versions. Le Dockerfile rappelle l'exigence Certificate Extension ≥ 2.0.73 depuis septembre 2025.
 
 ```sh
 docker compose --profile tizen build tizen
-docker compose --profile certificates build certificate-ui
-docker compose up -d certificate-ui
+docker compose run --rm tizen doctor
 ```
 
-L'image de base doit être construite avant l'image graphique. Cette dernière ajoute les paquets officiels `Certificate-Manager` et `cert-add-on`, ainsi qu'un bureau virtuel accessible avec noVNC. Aucune installation graphique ni connexion au serveur X de l'hôte n'est requise. Le bureau utilise un réseau Docker séparé de l'application ; seul son port noVNC est publié, sur localhost. La fenêtre officielle, l'accès HTTP et l'exigence d'un mot de passe VNC ont été vérifiés, sans lire ce mot de passe ni effectuer de connexion au compte Samsung.
+`doctor` vérifie uniquement la présence des CLI, pas les certificats ni la compatibilité TV.
 
-Ouvrir <http://127.0.0.1:6080/vnc.html>. Le mot de passe d'accès au bureau est généré aléatoirement dans le volume privé, jamais affiché dans les logs. Le consulter soi-même avec :
+### Préparer un profil
+
+La gestion des profils se fait uniquement en CLI, à partir de certificats existants. Pour émettre de nouveaux certificats Samsung TV, utiliser les outils officiels hors de ce projet.
+
+#### Importer depuis le répertoire courant
+
+Dans un dossier privé hors du dépôt contenant `author.p12` et `distributor.p12`, exécuter les commandes suivantes. Adapter le chemin du dépôt si nécessaire ; l'image SDK doit déjà être construite :
 
 ```sh
-docker compose exec certificate-ui cat /signing/.vnc/password.txt
+export TIZEN_CERTIFICATES_DIR="$(pwd -P)"
+docker compose -f /home/nathanael/dev/immich_kiosk_tizen/compose.yaml run --rm tizen profile-create ImmichKiosk
 ```
 
-Ne pas communiquer ce mot de passe dans une conversation ou un ticket. L'interface est publiée uniquement sur localhost. Depuis un autre ordinateur, utiliser un tunnel SSH vers la machine Docker, plutôt que d'exposer le port sur le réseau :
+`$(pwd -P)` désigne le dossier courant de l'hôte. Il est monté en lecture seule dans `/certificates` ; l'option `-f` permet de lancer Compose sans revenir dans le dépôt. Les deux noms de fichiers sont imposés par le script. Ne pas placer les certificats dans le dépôt.
+
+Depuis le dépôt, on peut aussi fournir le chemin absolu du dossier privé :
 
 ```sh
-ssh -N -L 6080:127.0.0.1:6080 UTILISATEUR@MACHINE_DOCKER
-```
-
-Dans le Certificate Manager officiel :
-
-1. Choisir **+ → Samsung → TV**.
-2. Créer un profil et un certificat auteur, avec son propre mot de passe.
-3. Effectuer la connexion Samsung et la validation à deux facteurs si demandée.
-4. Conserver les fichiers et la sauvegarde sous `/signing`, hors du dépôt.
-5. Créer le certificat distributeur de niveau **Public**, suffisant pour cette application.
-6. Ajouter le DUID exact de la TV, idéalement depuis la liste des appareils connectés, puis terminer le profil.
-
-Le SDK connaît `/home/sdk` comme répertoire utilisateur ; ce chemin pointe vers `/signing`. Le dossier de données `/home/sdk/tizen-studio-data` est donc persistant. Ne pas exécuter `docker compose down -v` : cela supprimerait aussi le volume contenant les certificats. Effectuer une sauvegarde privée avant toute suppression de volumes et conserver le même certificat auteur pour les futures mises à jour.
-
-Une fois le profil créé, arrêter le bureau puis importer son fichier XML pour la CLI :
-
-```sh
-docker compose stop certificate-ui
-docker compose run --rm tizen profile-import /signing/tizen-studio-data/profile/profiles.xml
-```
-
-La présence de l'interface ne prouve pas que Samsung a émis les certificats. Vérifier la fin de l'assistant et le profil créé avant de signer. Les logs de l'application graphique sont volontairement masqués pour ne pas collecter d'URL d'authentification.
-
-### Construction et signature
-
-Si seuls `author.p12` et `distributor.p12` sont disponibles, le profil peut être recréé sans émettre de nouveaux certificats Samsung. Un fichier `device-profile.xml` d'autorisation d'appareil ne doit pas être renommé en `profiles.xml`.
-
-```sh
-export TIZEN_CERTIFICATES_DIR=/chemin/absolu/vers/le/dossier/prive
-docker compose stop certificate-ui
+export TIZEN_CERTIFICATES_DIR="/chemin/absolu/vers/certificats"
 docker compose run --rm tizen profile-create ImmichKiosk
 ```
 
-La commande demande les mots de passe dans le terminal sans les afficher. Entrée au second mot de passe réutilise celui de l'auteur. Elle vérifie l'ouverture des PKCS12 et refuse de remplacer un profil existant. Les certificats d'origine restent en lecture seule : des copies de travail sont conservées dans `/signing/certificates`. Sous Linux, les références `.pwd` du XML sont des identifiants dans le trousseau Secret Service, pas des fichiers à copier. Le SDK peut annoncer un succès même sans trousseau opérationnel : la commande vérifie donc en mémoire les valeurs enregistrées, sans les afficher.
+Les mots de passe sont demandés sans affichage ; Entrée au second réutilise celui de l'auteur. La commande vérifie les PKCS12 et le trousseau, copie les certificats dans `/signing/certificates` et refuse d'écraser un profil existant. `device-profile.xml` n'est pas un `profiles.xml`. Pour réparer un profil dont le trousseau est incomplet, conserver le dossier externe et exécuter `docker compose run --rm tizen profile-repair ImmichKiosk` ; les anciens XML sont sauvegardés dans le volume privé.
 
-L'image CLI démarre une session D-Bus privée et déverrouille le trousseau pour la création, la réparation et la signature. Le trousseau chiffré est conservé dans `/signing/.local/share/keyrings`, avec une clé de déverrouillage aléatoire en mode `600` dans `/signing/.keyring-password`. Conserver tout le volume privé pour les sauvegardes. Cette clé stockée localement permet la signature sans saisie à chaque commande, mais ne protège pas contre une personne ayant accès à l'intégralité du volume. Ne pas lancer plusieurs opérations de signature ou le bureau et la CLI simultanément.
+#### Importer un registre existant
 
-La CLI officielle impose le passage des mots de passe comme arguments de son processus : utiliser uniquement une machine de confiance, où ces arguments ne sont pas exposés à d'autres utilisateurs. Ne pas fournir les mots de passe dans la ligne de commande, les variables d'environnement ou la conversation.
-
-Pour réparer un profil précédemment créé sans enregistrement effectif des mots de passe dans le trousseau, conserver la même variable `TIZEN_CERTIFICATES_DIR` puis exécuter :
+Avec un véritable `profiles.xml` dans le dossier privé courant, importer le registre. Ses chemins de certificats doivent référencer le montage `/certificates` :
 
 ```sh
-docker compose run --rm tizen profile-repair ImmichKiosk
+export TIZEN_CERTIFICATES_DIR="$(pwd -P)"
+docker compose -f /home/nathanael/dev/immich_kiosk_tizen/compose.yaml run --rm tizen profile-import
 ```
 
-Les mots de passe doivent être saisis à nouveau. Les anciens XML sont sauvegardés dans un dossier privé `/signing/profile-backup.*` avant modification ; les certificats source ne sont pas modifiés. La réparation refuse de remplacer des copies privées par des certificats différents.
+Cette commande remplace `/signing/profiles.xml` sans sauvegarde automatique. Elle copie uniquement le registre XML : elle ne copie pas les certificats et ne recrée pas les mots de passe du trousseau. Conserver le montage externe lors de la signature. Pour des certificats provenant d'une autre machine, préférer `profile-create` avec les deux `.p12` ; si le profil est déjà importé mais son trousseau incomplet, utiliser `profile-repair` avec ces mêmes certificats.
 
-Le test de ce flux utilise exclusivement des certificats synthétiques et des volumes anonymes jetables. Il couvre les sources non inscriptibles, le trousseau chiffré, la sauvegarde/réparation du profil, la restauration après erreur et la signature d'un widget dans une nouvelle session D-Bus :
+**Sauvegarder tout le volume `signing` et conserver le même certificat auteur pour les mises à jour. Ne pas exécuter `docker compose down -v` sans sauvegarde.** `/home/sdk` pointe vers `/signing`. Le trousseau chiffré et sa clé locale y persistent ; ils ne protègent pas contre un accès à l'intégralité du volume. La CLI officielle transmet les mots de passe comme arguments de processus : utiliser une machine de confiance, sans fournir ces secrets dans les commandes ou variables d'environnement.
+
+### Signer et installer
+
+Remplacer `NOM_PROFIL`, `IP_TV` et `NOM_CIBLE` par les valeurs du profil et de la TV autorisée :
+
+```sh
+docker compose run --rm tooling npm run build
+docker compose run --rm tizen package NOM_PROFIL
+docker compose run --rm tizen connect IP_TV
+docker compose run --rm tizen install IP_TV NOM_CIBLE /workspace/artifacts/signed/ImmichKiosk.wgt
+```
+
+La signature produit `artifacts/signed/ImmichKiosk.wgt`, renommé sans espace sans modifier les octets signés. Activer le mode développeur, autoriser la machine et vérifier que le certificat distributeur couvre la TV. `install` reconnecte SDB dans son propre conteneur ; une connexion précédente ne persiste pas après `--rm`. Le script refuse `UNSIGNED` et exige les fichiers de signature, sans remplacer la validation cryptographique de Tizen.
+
+Tester le réseau bridge en premier. Sur Linux uniquement, si nécessaire, remplacer `tizen` par `tizen-host` pour utiliser le réseau hôte. Sur TV, valider d'abord Simple ou Enrichi, puis Full, le clavier, les touches média, le retour, la sortie et la reprise. Consigner modèle, firmware, version/digest Kiosk et comportement mémoire/réseau lors d'un essai prolongé.
+
+Le test SDK suivant utilise des certificats synthétiques et des volumes anonymes jetables ; il couvre création, réparation, restauration et signature dans une nouvelle session D-Bus :
 
 ```sh
 docker compose run --rm --no-deps --volume /signing --volume /certificates --entrypoint python3 tizen /workspace/tests/tizen-profile.py
 ```
 
-Si un véritable `profiles.xml` est déjà disponible, utiliser plutôt `profile-import` comme ci-dessous. Après `profile-create`, ignorer cette étape d'import et passer directement à la construction/signature.
+## Contribution
 
-```sh
-docker compose --profile tizen build tizen
-docker compose run --rm tizen doctor
-docker compose run --rm tizen profile-import
-docker compose run --rm tooling npm run build
-docker compose run --rm tizen package NOM_PROFIL
-```
+1. Créer un fork et une branche dédiée.
+2. Modifier les sources dans `app/` ou `tools/`, pas les sorties `dist/` et `artifacts/`.
+3. Ajouter les tests adaptés et exécuter les suites unitaires et navigateur dans Docker.
+4. Vérifier la cible Chromium 69 ; distinguer résultats simulés et essais réels sur TV.
+5. Soumettre une pull request sans certificats, secrets ni fichiers générés.
 
-Remplacer `NOM_PROFIL` par un profil du fichier importé. Les paquets produits par la commande de signature sont placés dans `artifacts/signed/`. La commande `doctor` vérifie la présence des CLI, pas la validité du certificat, des extensions ou de la compatibilité TV.
+## Licence et références
 
-Utiliser `ImmichKiosk.wgt` sans espace pour le transfert et l'installation. Le SDK crée initialement `Immich Kiosk.wgt`, puis la commande le renomme automatiquement sans modifier les octets signés. Seul le nom sans espace est conservé, car la commande d'installation distante peut mal interpréter un espace dans le chemin.
+Aucune licence globale du projet n'est spécifiée. Cette adaptation Tizen n'est pas une application officielle d'Immich Kiosk.
 
-### Installation privée sur TV
-
-Activer le mode développeur selon la procédure Samsung du modèle, autoriser la machine de développement et vérifier la connectivité réseau. Le certificat de distribution doit autoriser la TV cible lorsque ce mécanisme est requis. Installer uniquement après accord du propriétaire de la TV.
-
-```sh
-docker compose run --rm tizen connect IP_TV
-docker compose run --rm tizen install IP_TV NOM_CIBLE /workspace/artifacts/signed/NOM_PAQUET.wgt
-```
-
-Remplacer les valeurs symboliques par l'adresse de la TV, le nom de cible attendu par la CLI et le nom réel du widget signé. La commande `install` reconnecte SDB dans le même conteneur : la connexion d'un précédent conteneur `--rm` ne persiste pas. Le script refuse les fichiers nommés `UNSIGNED` et exige la présence des fichiers de signature ; cela ne remplace pas la validation cryptographique par Tizen.
-
-Tester d'abord le réseau bridge par défaut. Sur Linux uniquement, si celui-ci empêche la connexion, le service optionnel `tizen-host` permet de répéter ces commandes avec le réseau hôte :
-
-```sh
-docker compose run --rm tizen-host connect IP_TV
-docker compose run --rm tizen-host install IP_TV NOM_CIBLE /workspace/artifacts/signed/NOM_PAQUET.wgt
-```
-
-## Structure
-
-```text
-app/                  Interface, lecteur, adaptateur, manifeste et icônes
-tests/                Tests unitaires, navigateur et fixtures synthétiques
-tools/                Serveur local, construction, paquetage et commandes Tizen
-Dockerfile            Environnement Node et Playwright
-Dockerfile.tizen      Environnement SDK conditionné à l'installateur et aux licences
-compose.yaml          Services, profils et volumes Docker
-dist/                 Application construite
-artifacts/            Paquets et captures de test
-```
-
-## Validation restante
-
-- Relever la version et le digest de l'image Kiosk réellement déployée.
-- Vérifier l'origine Tizen, les prérequêtes CORS et les images authentifiées sur le réseau réel.
-- Construire l'environnement SDK avec les extensions officielles et vérifier le profil Samsung.
-- Signer et installer le widget sur la TV autorisée.
-- Tester les photos, le clavier TV, les touches média, le retour, la sortie et la reprise après arrière-plan.
-- Effectuer un test prolongé et consigner le modèle de TV, le firmware, la version Kiosk et les résultats mémoire/réseau.
-
-## Références
+Le logo provient sans modification de [`assets/logo.svg` d'Immich Kiosk v0.44.1](https://github.com/damongolding/immich-kiosk/blob/v0.44.1/assets/logo.svg). Sa source est conservée dans [app/icon.svg](app/icon.svg), avec la [licence AGPL-3.0 amont](app/immich-kiosk-logo.LICENSE.txt). L'icône PNG 117 × 117 a été convertie le 28 septembre 2026 ; la régénérer avec `docker compose run --rm tooling npm run icon`.
 
 - [Documentation Immich Kiosk](https://docs.immichkiosk.app/)
 - [Sources Kiosk v0.44.1](https://github.com/damongolding/immich-kiosk/tree/v0.44.1)

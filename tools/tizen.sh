@@ -9,7 +9,7 @@ case "${1:-doctor}" in
     printf '%s\n' 'CLI present. Samsung extensions, certificates and TV compatibility are NOT verified.'
     ;;
   profile-import)
-    # Import either external certificates or a profile created in the private GUI.
+    # Import an existing profile registry into the private signing volume.
     source=${2:-/certificates/profiles.xml}
     test -f "$source"
     if [ "$source" != /signing/profiles.xml ]; then cp "$source" /signing/profiles.xml; fi
@@ -26,7 +26,7 @@ case "${1:-doctor}" in
       [ -e /signing/tizen-studio-data/profile/profiles.xml ] &&
       grep -Eq '<([[:alnum:]_.-]+:)?profile([[:space:]/>])' /signing/tizen-studio-data/profile/profiles.xml
     }; }; then
-      printf '%s\n' 'A signing profile already exists. Use Certificate Manager to update it without overwriting existing profiles.' >&2
+      printf '%s\n' 'A signing profile already exists. Use profile-repair PROFILE_NAME to repair it with the same certificates.' >&2
       exit 2
     fi
     if [ "$1" = profile-repair ] && [ ! -f /signing/profiles.xml ]; then
@@ -99,7 +99,7 @@ case "${1:-doctor}" in
     # only on a trusted host where process arguments cannot expose credentials.
     if ! tizen security-profiles add -n "$2" -a /signing/certificates/author.p12 -p "$author_password" \
         -d /signing/certificates/distributor.p12 -dp "$distributor_password" -A -f >/dev/null 2>&1; then
-      printf '%s\n' 'Profile creation failed. Use Certificate Manager to import the existing certificates.' >&2
+      printf '%s\n' 'Profile creation failed. Check the SDK installation and certificate compatibility.' >&2
       exit 1
     fi
     secret_tool=/opt/tizen-studio/tools/certificate-encryptor/secret-tool
