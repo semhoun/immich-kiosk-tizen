@@ -13,11 +13,16 @@ label { display: block; font-size: 22px; margin: 16px 0 9px; }
 label span, .hint { color: #bdc8da; }
 input:not([type=checkbox]), select, button { font: inherit; font-size: 21px; border: 2px solid #566781; border-radius: 7px; color: #f1f4f9; background: #1d2b43; padding: 14px 18px; min-height: 56px; }
 input:not([type=checkbox]), select { width: 100%; }
+.field-entry { width: 100%; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.field-entry.empty { color: #96a6be; }
 input::placeholder { color: #96a6be; }
 input:focus, select:focus, button:focus { outline: 5px solid #a6c9ff; outline-offset: 4px; box-shadow: 0 0 0 9px #111a2b; }
 input:not([type=checkbox]):focus { border-color: #fff; background: #30415e; }
 .hint { font-size: 16px; line-height: 1.4; margin: 10px 0; }
 .check { display: flex; align-items: center; }
+.password-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+.password-options .check { min-width: 0; font-size: 20px; }
+.password-options input { flex-shrink: 0; }
 input[type=checkbox] { width: 28px; height: 28px; margin: 0 14px 0 0; }
 .options { display: grid; grid-template-columns: 1fr 1.25fr; column-gap: 24px; }
 .actions { display: flex; flex-wrap: wrap; margin: 16px -8px -8px; }

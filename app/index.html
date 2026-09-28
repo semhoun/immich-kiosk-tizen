@@ -12,21 +12,27 @@
 </head>
 <body>
   <main id="settings" class="settings">
-    <header><p class="eyebrow">IMMICH / KIOSK</p><h1>Vos photos. <br>Tout l’écran.</h1><p>Connectez votre serveur Kiosk. <br>La télévision devient votre album.</p><div class="remote-help">Haut / bas : naviguer<br>Gauche / droite ou OK : changer un choix<br>Saisie : clavier de la TV<br>Terminé / Retour : quitter la saisie</div></header>
+    <header><p class="eyebrow">IMMICH / KIOSK</p><h1>Vos photos. <br>Tout l’écran.</h1><p>Connectez votre serveur Kiosk. <br>La télévision devient votre album.</p><div class="remote-help">Flèches : naviguer entre les réglages<br>OK sur un choix : changer sa valeur<br>OK sur un champ : ouvrir le clavier<br>Terminé / Retour : quitter la saisie</div></header>
     <form id="form" novalidate>
       <h2>Réglages du diaporama</h2>
+      <p id="app-version" class="hint">Version __APP_VERSION__</p>
       <p id="startup-status" class="hint" role="status">Démarrage de l’application…</p>
       <label for="mode">Présentation</label>
       <select id="mode" aria-describedby="mode-help"><option value="simple">Simple · photos uniquement</option><option value="enriched">Enrichi · photos, horloge et date</option><option value="full">Full · site Kiosk original</option></select>
       <p class="hint" id="mode-help">Lecteur local léger, conçu pour Tizen 5.5.</p>
-      <label for="url">Adresse du serveur Kiosk</label>
-      <input id="url" type="text" inputmode="url" autocapitalize="none" placeholder="https://kiosk.exemple.fr" autocomplete="off" spellcheck="false" aria-describedby="url-help">
+      <label id="url-label" for="url">Adresse du serveur Kiosk</label>
+      <button id="url-activate" type="button" class="field-entry empty" aria-labelledby="url-label" aria-describedby="url-help" aria-controls="url">https://kiosk.exemple.fr</button>
+      <input id="url" hidden type="text" inputmode="url" autocapitalize="none" placeholder="https://kiosk.exemple.fr" autocomplete="off" spellcheck="false" aria-describedby="url-help">
       <p class="hint" id="url-help">Les chemins et filtres de l’adresse sont conservés. HTTP n’est pas chiffré.</p>
-      <label for="password">Mot de passe Kiosk <span>(facultatif)</span></label>
-      <input id="password" type="password" autocomplete="off">
-      <label class="check"><input id="remember" type="checkbox"> Mémoriser le mot de passe</label>
+      <label id="password-label" for="password">Mot de passe Kiosk <span>(facultatif)</span></label>
+      <button id="password-activate" type="button" class="field-entry empty" aria-labelledby="password-label" aria-controls="password">Appuyer sur OK pour saisir</button>
+      <input id="password" hidden type="password" autocomplete="off" placeholder="Appuyer sur OK pour saisir">
+      <div class="password-options">
+        <label class="check"><input id="remember" type="checkbox"> Mémoriser le mot de passe</label>
+        <label class="check"><input id="show-password" type="checkbox" autocomplete="off"> Afficher le mot de passe</label>
+      </div>
       <p class="hint">Stockage local non chiffré. Décocher efface immédiatement le secret enregistré.</p>
-      <div class="options"><div><label for="duration">Durée par photo</label><select id="duration"><option value="5">5 secondes</option><option value="10">10 secondes</option><option value="15" selected>15 secondes</option><option value="30">30 secondes</option><option value="60">1 minute</option></select></div><div><label for="fit">Affichage</label><select id="fit"><option value="contain">Contenir · photo entière</option><option value="cover">Remplir · recadrage</option></select></div></div>
+      <div id="local-options" class="options"><div><label for="duration">Durée par photo</label><select id="duration"><option value="5">5 secondes</option><option value="10">10 secondes</option><option value="15" selected>15 secondes</option><option value="30">30 secondes</option><option value="60">1 minute</option></select></div><div><label for="fit">Affichage</label><select id="fit"><option value="contain">Contenir · photo entière</option><option value="cover">Remplir · recadrage</option></select></div></div>
       <div class="actions"><button type="button" id="connect">Tester la connexion</button><button type="submit" id="start" class="primary">Lancer le diaporama</button><button type="button" id="clear" class="quiet">Effacer les réglages</button></div>
       <p id="message" role="status" aria-live="polite"></p>
     </form>

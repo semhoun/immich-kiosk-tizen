@@ -15,6 +15,8 @@ test('widget targets Tizen 5.5 without changing its installed application identi
   const xml = await readFile(new URL('../app/config.xml', import.meta.url), 'utf8');
   assert.match(xml, /required_version="5\.5"/);
   assert.match(xml, /id="ImmichKios\.Kiosk" package="ImmichKios"/);
+  const metadata = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(xml.match(/<widget\b[^>]*\bversion="([^"]+)"/)[1], metadata.version);
 });
 
 test('legacy CSS has readable type sizes and flex spacing without modern support', async () => {

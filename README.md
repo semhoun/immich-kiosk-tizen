@@ -1,6 +1,6 @@
 # Immich Kiosk pour Tizen
 
-Application Web locale pour afficher les photos d'un serveur Immich Kiosk sur une télévision Samsung ciblant **Tizen 5.5 / Chromium 69**. Le widget 1.0.2 utilise un script classique compilé pour Chromium 69, sans dépendre du chargement des modules natifs. Le manifeste exige Tizen 5.5 minimum.
+Application Web locale pour afficher les photos d'un serveur Immich Kiosk sur une télévision Samsung ciblant **Tizen 5.5 / Chromium 69**. Le widget utilise un script classique compilé pour Chromium 69, sans dépendre du chargement des modules natifs. Le manifeste exige Tizen 5.5 minimum. La version du paquet est affichée dans les réglages, automatiquement à partir de `app/config.xml`.
 
 L'application ne contacte pas directement Immich : Kiosk conserve la sélection des photos et la clé API Immich. Les modes Simple et Enrichi utilisent un lecteur local, sans exécuter le HTML ou les scripts distants. Le mode Full affiche le site original dans une iframe isolée, après confirmation.
 
@@ -9,7 +9,7 @@ L'application ne contacte pas directement Immich : Kiosk conserve la sélection 
 - Lecteur et interface de configuration implémentés en HTML, CSS et JavaScript, sans framework.
 - Contrat Kiosk **v0.44.1** étudié au commit `d567ac041fc93c3d5421aecdcdf5941118022ccb`, avec fixtures synthétiques et anonymisées. Les autres versions sont refusées explicitement par les lecteurs locaux ; Full ne passe pas par cet adaptateur.
 - Tests exécutés dans Docker avec Node **22.14.0**, Playwright **1.51.1** et Chromium **134**. Le test navigateur masque `globalThis` dans les modules applicatifs pour couvrir son absence sur Chromium 69 ; cela ne remplace pas le moteur réel de la TV.
-- Dernière validation : **29 tests unitaires et 12 groupes de tests navigateur réussis**, incluant les codes numériques Samsung et les événements IME Terminé/Annuler sur le script compilé.
+- Dernière validation : **29 tests unitaires et 14 groupes de tests navigateur réussis**, incluant la navigation entre colonnes, les contrôles masqués en Full, les codes numériques Samsung, les événements IME Terminé/Annuler et l'affichage temporaire du mot de passe sur le script compilé.
 - SDK CLI et Certificate Manager lancés dans Docker, extension Samsung Certificate **2.0.75** vérifiée. Les certificats créés manuellement ont été importés et les paquets signés dans Docker. L'utilisateur a confirmé l'installation de la version 1.0.1 depuis Windows ; la correction de saisie 1.0.2 reste à valider sur TV. La création de certificats via la connexion Samsung du bureau Docker n'a pas été validée de bout en bout.
 - Des sondes HTTPS/CORS de diagnostic ont été réalisées, mais l'intégration complète avec le serveur réel et les essais sur TV restent à effectuer. La compatibilité matérielle Tizen 5.5 n'est pas validée.
 
@@ -25,6 +25,7 @@ L'application ne contacte pas directement Immich : Kiosk conserve la sélection 
 - URL HTTP(S) configurable, chemins de base et paramètres répétés conservés.
 - Mot de passe Kiosk facultatif, envoyé dans l'en-tête `X-Api-Key` en Simple/Enrichi et dans le paramètre d'URL `password` en Full.
 - Mémorisation du mot de passe désactivée par défaut ; suppression du secret enregistré dès que la case est décochée.
+- Affichage temporaire du mot de passe sur demande, non mémorisé et automatiquement masqué à la sortie des réglages ou en arrière-plan.
 - Requêtes annulables, délais bornés, trois relances réseau maximum et suspension en arrière-plan.
 - Dernière photo conservée en cas d'erreur transitoire ; aucune relance automatique après une erreur d'authentification observable.
 
@@ -48,7 +49,7 @@ Il ne s'agit pas d'une reproduction complète de Kiosk : la météo, les informa
 
 ### Full
 
-Full conserve les paramètres de l'URL, sans imposer `layout=single` ou les options photos uniquement. La durée et l'ajustement locaux sont désactivés : le site Kiosk les gère lui-même. Les lancements manuels via **Ouvrir le site Full** et **Lancer le diaporama** demandent une confirmation. Une fois les réglages enregistrés, Full démarre automatiquement au rechargement de l'application, sans nouvelle confirmation en HTTPS. Un mot de passe nécessaire au démarrage doit être mémorisé via la case dédiée. En HTTP avec mot de passe, la confirmation reste obligatoire avant l'envoi du secret.
+Full conserve les paramètres de l'URL, sans imposer `layout=single` ou les options photos uniquement. **Durée par photo**, **Affichage** et **Lancer le diaporama** sont masqués dans ce mode : le site Kiosk gère ses propres réglages. Le lancement manuel utilise **Ouvrir le site Full** et demande une confirmation. En revenant à Simple ou Enrichi, les contrôles locaux réapparaissent avec leurs valeurs conservées. Une fois les réglages enregistrés, Full démarre automatiquement au rechargement de l'application, sans nouvelle confirmation en HTTPS. Un mot de passe nécessaire au démarrage doit être mémorisé via la case dédiée. En HTTP avec mot de passe, la confirmation reste obligatoire avant l'envoi du secret.
 
 Full utilise l'authentification native `?password=...` de Kiosk : une iframe ne peut pas joindre `X-Api-Key` à sa navigation. Le mot de passe peut être saisi dans son champ ou fourni dans l'URL collée. Il est extrait de l'adresse des réglages, puis ajouté avec un encodage adapté uniquement à l'URL du cadre au lancement. Les paramètres répétés et la disposition Kiosk sont conservés.
 
@@ -99,6 +100,10 @@ Les outils s'exécutent avec les UID/GID `1000:1000` par défaut. Si nécessaire
 
 ## Configuration du lecteur
 
+La case **Afficher le mot de passe** révèle le texte dans le champ et sa zone de sélection. Elle est désactivée au démarrage et n'est jamais enregistrée. Elle se trouve sur la même ligne que **Mémoriser le mot de passe**, avec une navigation Gauche/Droite entre les deux cases. Les deux options sont indépendantes : mémoriser contrôle uniquement la conservation du secret entre les lancements.
+
+La version actuelle est **0.9.2**. Si une ancienne version de développement `1.0.x` est déjà installée, la TV peut refuser cette rétrogradation. Dans ce cas, une désinstallation préalable peut être nécessaire et effacera les réglages locaux de l'application.
+
 1. Choisir Simple ou Enrichi pour le lecteur local, puis saisir l'adresse du serveur Kiosk avec son éventuel préfixe et ses filtres, par exemple `https://kiosk.exemple.fr/cadre/?album=album-a&album=album-b`.
 2. Saisir le mot de passe natif Kiosk, si nécessaire.
 3. Choisir la durée et l'ajustement de l'image.
@@ -117,10 +122,12 @@ Si une configuration est enregistrée, l'application tente de démarrer le diapo
 
 | Touche | Action |
 | --- | --- |
-| Haut / bas dans les réglages | Déplacer le focus |
-| Gauche / droite ou OK sur un choix | Changer la présentation, la durée ou l'ajustement |
-| Focus / OK sur un champ texte | Utiliser le clavier natif Samsung, sans verrouillage en lecture seule |
-| Terminé / Annuler du clavier TV | Fermer la saisie et revenir aux commandes locales |
+| Haut / bas dans les réglages | Déplacer le focus, y compris entre mot de passe et adresse hors composition IME |
+| Gauche / droite dans une rangée | Passer entre Durée et Affichage, ou entre les boutons, sans changer les valeurs |
+| OK sur un choix | Changer la présentation, la durée ou l'ajustement |
+| Focus sur un champ texte | Sélectionner le champ sans ouvrir le clavier |
+| OK ou clic sur un champ texte | Activer la saisie et ouvrir le clavier natif Samsung |
+| Terminé / Annuler du clavier TV | Fermer la saisie et revenir au champ sélectionné, clavier fermé |
 | Gauche / droite dans le diaporama | Photo précédente / suivante |
 | OK / Entrée dans le diaporama | Pause / reprise |
 | Touches média prises en charge | Lecture, pause ou bascule |
@@ -285,7 +292,7 @@ docker compose run --rm tizen package NOM_PROFIL
 
 Remplacer `NOM_PROFIL` par un profil du fichier importé. Les paquets produits par la commande de signature sont placés dans `artifacts/signed/`. La commande `doctor` vérifie la présence des CLI, pas la validité du certificat, des extensions ou de la compatibilité TV.
 
-Utiliser la copie `ImmichKiosk.wgt` sans espace pour le transfert et l'installation. Le SDK produit aussi `Immich Kiosk.wgt`, dont les octets signés sont identiques, mais sa commande d'installation distante peut mal interpréter l'espace dans le chemin.
+Utiliser `ImmichKiosk.wgt` sans espace pour le transfert et l'installation. Le SDK crée initialement `Immich Kiosk.wgt`, puis la commande le renomme automatiquement sans modifier les octets signés. Seul le nom sans espace est conservé, car la commande d'installation distante peut mal interpréter un espace dans le chemin.
 
 ### Installation privée sur TV
 

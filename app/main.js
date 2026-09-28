@@ -30,6 +30,8 @@ function message(text) { $('message').textContent = text; }
 function updateMode() {
   const full = $('mode').value === 'full';
   $('duration').disabled = $('fit').disabled = full;
+  $('local-options').hidden = full;
+  $('start').hidden = full;
   $('connect').textContent = full ? 'Ouvrir le site Full' : 'Tester la connexion';
   $('mode-help').textContent = full ?
     'Présentation et rythme du site Kiosk original. En Full, le mot de passe est transmis dans le paramètre password de l’URL après confirmation.' :
@@ -50,6 +52,7 @@ function fill(settings) {
     $('duration').appendChild(option);
   }
   fields.forEach(key => { if (key === 'remember') $(key).checked = settings[key]; else $(key).value = key === 'mode' ? settings.mode || 'simple' : settings[key]; });
+  ['url', 'password'].forEach(updateField);
   updateMode();
 }
 function readSettings() {
@@ -69,6 +72,7 @@ function screensaver(enabled) {
   } catch (_) { /* Firmware support is best effort, never bypass panel protection. */ }
 }
 function stop() {
+  setPasswordVisible(false);
   generation++;
   if (connection) connection.abort();
   connection = null;
@@ -108,7 +112,7 @@ async function run(start, automatic = false) {
   stop();
   const token = generation;
   let settings;
-  try { settings = readSettings(); } catch (_) { message('Saisissez une adresse HTTP ou HTTPS valide, sans identifiants intégrés.'); $('url').focus(); return; }
+  try { settings = readSettings(); } catch (_) { message('Saisissez une adresse HTTP ou HTTPS valide, sans identifiants intégrés.'); activateField('url'); return; }
   if (settings.mode === 'full') {
     try { fullURL(settings); } catch (error) { message(error.message); return; }
     let notice = 'La lecture est gérée par le site Kiosk original. Haut ou Retour permettent de retrouver les réglages.';
@@ -190,6 +194,7 @@ $('remember').onchange = () => {
     catch (_) { message('Échec de suppression du mot de passe enregistré. Effacez le stockage de l’application.'); }
   }
 };
+$('show-password').onchange = () => setPasswordVisible($('show-password').checked);
 $('clear').onclick = async () => {
   if (!await ask('Effacer les réglages ?', 'L’adresse et le mot de passe enregistrés seront supprimés.')) return;
   stop();
@@ -198,23 +203,48 @@ $('clear').onclick = async () => {
   fill({ url: '', password: '', remember: false, duration: 15, fit: 'contain' });
   showSettings('Réglages effacés.');
 };
+function updateField(id) {
+  const field = $(id);
+  const button = $(id + '-activate');
+  button.textContent = field.value ? (id === 'password' && !$('show-password').checked ? '********' : field.value) : field.placeholder;
+  button.classList.toggle('empty', !field.value);
+}
+function setPasswordVisible(visible) {
+  $('show-password').checked = visible;
+  $('password').type = visible ? 'text' : 'password';
+  updateField('password');
+}
+function closeField(field) {
+  if (editing === field) editing = null;
+  field.hidden = true;
+  $(field.id + '-activate').hidden = false;
+  updateField(field.id);
+}
+function activateField(id) {
+  if (editing) editing.blur();
+  $(id + '-activate').hidden = true;
+  $(id).hidden = false;
+  $(id).focus();
+}
 function endEditing() {
   if (!editing) return;
   const field = editing;
-  editing = null;
   field.blur();
-  $('connect').focus();
+  closeField(field);
+  $(field.id + '-activate').focus();
 }
 ['url', 'password'].forEach(id => {
-  // Samsung opens its IME when an editable input receives focus. Do not toggle
-  // readonly or cancel its key events: that can suppress native text entry.
+  // Navigate on a button without invoking the IME; focus the real editable
+  // input only after explicit activation. Never toggle its readonly state.
+  $(id + '-activate').onclick = () => activateField(id);
+  $(id + '-label').onclick = event => { event.preventDefault(); activateField(id); };
   $(id).addEventListener('focus', () => { editing = $(id); });
-  $(id).addEventListener('blur', () => { if (editing === $(id)) editing = null; });
+  $(id).addEventListener('blur', () => closeField($(id)));
 });
-function changeChoice(select, direction) {
+function changeChoice(select) {
   const options = Array.from(select.options).filter(option => !option.disabled);
   const index = options.findIndex(option => option.value === select.value);
-  select.value = options[(index + direction + options.length) % options.length].value;
+  select.value = options[(index + 1) % options.length].value;
   select.dispatchEvent(new Event('change', { bubbles: true }));
 }
 function moveFocus(key) {
@@ -225,12 +255,24 @@ function moveFocus(key) {
   const rect = current.getBoundingClientRect();
   const horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
   const sign = key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1;
+  if (horizontal) {
+    // Keep horizontal moves in their logical row, even when buttons wrap.
+    const group = current.closest('.options, .actions, .password-options') || (root.id === 'player-actions' ? root : null);
+    if (group && root.contains(group)) {
+      const siblings = controls.filter(el => group.contains(el));
+      const next = siblings[siblings.indexOf(current) + sign];
+      if (next) next.focus();
+      return;
+    }
+    if (root.id === 'settings') return;
+  }
   const candidates = controls.filter(el => el !== current).map(el => {
     const r = el.getBoundingClientRect();
     const dx = (r.left + r.right - rect.left - rect.right) / 2;
     const dy = (r.top + r.bottom - rect.top - rect.bottom) / 2;
     const primary = (horizontal ? dx : dy) * sign;
-    const cross = Math.abs(horizontal ? dy : dx);
+    // Overlapping controls share an axis even when one is a narrow checkbox.
+    const cross = horizontal ? Math.max(0, r.top - rect.bottom, rect.top - r.bottom) : Math.max(0, r.left - rect.right, rect.left - r.right);
     return { el, primary, score: primary + cross * 3 };
   }).filter(item => item.primary > 5).sort((a, b) => a.score - b.score);
   if (candidates[0]) candidates[0].el.focus();
@@ -241,6 +283,7 @@ document.addEventListener('keydown', async event => {
   const back = key === 'Escape' || key === 'BrowserBack' || code === 10009;
   if (editing) {
     if (code === 65376 || code === 65385 || back) endEditing();
+    else if (!event.isComposing && (key === 'ArrowUp' || key === 'ArrowDown')) moveFocus(key);
     return;
   }
   if (modalResolve && key === 'Tab') {
@@ -281,11 +324,11 @@ document.addEventListener('keydown', async event => {
     return;
   }
   const focused = document.activeElement;
-  if (focused.tagName === 'SELECT' && ['ArrowLeft', 'ArrowRight', 'Enter'].includes(key)) {
+  if (focused.tagName === 'SELECT' && key === 'Enter') {
     event.preventDefault();
-    changeChoice(focused, key === 'ArrowLeft' ? -1 : 1);
+    changeChoice(focused);
   } else if (key.startsWith('Arrow')) { event.preventDefault(); moveFocus(key); }
-  else if (key === 'Enter' && (focused === $('remember') || focused.tagName === 'BUTTON')) {
+  else if (key === 'Enter' && (focused.matches('input[type="checkbox"]') || focused.tagName === 'BUTTON')) {
     event.preventDefault();
     focused.click();
   }
@@ -294,6 +337,7 @@ document.addEventListener('visibilitychange', () => {
   presentation.suspend(document.hidden);
   full.suspend(document.hidden);
   if (document.hidden) {
+    setPasswordVisible(false);
     if (modalResolve) closeModal(false);
     if (connection) { generation++; connection.abort(); connection = null; }
     if (player) player.suspend(true);
@@ -311,6 +355,7 @@ try {
 } catch (_) { /* Desktop preview has no TV APIs. */ }
 try { fill(storage ? loadSettings(storage) : { url: '', password: '', remember: false, duration: 15, fit: 'contain' }); }
 catch (_) { message('Réglages enregistrés illisibles. Saisissez à nouveau le serveur.'); }
+setPasswordVisible(false);
 $('mode').focus();
 document.documentElement.setAttribute('data-kiosk-ready', 'true');
 window.dispatchEvent(new Event('kiosk-ready'));

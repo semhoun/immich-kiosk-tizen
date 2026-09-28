@@ -125,7 +125,7 @@ case "${1:-doctor}" in
     mkdir -p /workspace/artifacts/signed
     tizen package -t wgt -s "$2" -o /workspace/artifacts/signed -- /workspace/dist
     # The TV install command does not reliably quote remote filenames.
-    cp '/workspace/artifacts/signed/Immich Kiosk.wgt' /workspace/artifacts/signed/ImmichKiosk.wgt
+    mv -f '/workspace/artifacts/signed/Immich Kiosk.wgt' /workspace/artifacts/signed/ImmichKiosk.wgt
     printf '%s\n' 'TV installation package: artifacts/signed/ImmichKiosk.wgt'
     ;;
   connect)

@@ -5,7 +5,7 @@
     if (document.documentElement.getAttribute('data-kiosk-ready') === 'true') {
       status.hidden = true;
     } else {
-      status.textContent = 'Le lecteur n’a pas démarré. Fermez puis relancez l’application (version 1.0.2).';
+      status.textContent = 'Le lecteur n’a pas démarré. Fermez puis relancez l’application (' + document.getElementById('app-version').textContent + ').';
     }
   }
   var timer = setTimeout(check, 6000);
