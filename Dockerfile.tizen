@@ -10,28 +10,42 @@ FROM ubuntu:22.04@sha256:b8b6ee6aa931ecd9d0d952abc34dc0e5f7c6a30c6bb71b079fe399f
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates gosu openjdk-17-jre-headless unzip zip libusb-1.0-0 libncurses5 \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --uid 1000 sdk && mkdir -p /opt/tizen-studio \
-    && chown sdk:sdk /opt/tizen-studio
+    && useradd --create-home --uid 1000 sdk \
+    && chown sdk:sdk /opt
 ARG TIZEN_ACCEPT_LICENSE=no
 ARG TIZEN_INSTALLER_SHA256=unset
 # Add only package IDs verified with package-manager-cli show-pkgs for your installer.
 # This does not invent Samsung extension IDs or accept their terms by default.
 ARG TIZEN_PACKAGES=WebCLI
 USER sdk
-RUN --mount=type=secret,id=tizen_installer,target=/run/tizen-installer.bin,uid=1000,required=true \
+RUN --mount=type=bind,from=tizen_installer,source=web-cli_Tizen_Studio_6.1_ubuntu-64.bin,target=/run/tizen-installer.bin \
     test "$TIZEN_ACCEPT_LICENSE" = yes \
     && test ${#TIZEN_INSTALLER_SHA256} -eq 64 \
     && printf '%s  %s\n' "$TIZEN_INSTALLER_SHA256" /run/tizen-installer.bin | sha256sum -c - \
-    && bash /run/tizen-installer.bin --accept-license /opt/tizen-studio \
-    && /opt/tizen-studio/package-manager/package-manager-cli.bin install --accept-license $TIZEN_PACKAGES \
+    && bash /run/tizen-installer.bin --accept-license /home/sdk/tizen-studio \
+    && test -x /home/sdk/tizen-studio/package-manager/package-manager-cli.bin \
+    && ln -s /home/sdk/tizen-studio /opt/tizen-studio \
     && test -x /opt/tizen-studio/tools/ide/bin/tizen \
     && test -x /opt/tizen-studio/tools/sdb
+# The web-cli installer already includes WebCLI. Avoid a redundant online update.
+RUN if [ "$TIZEN_PACKAGES" != WebCLI ]; then \
+      timeout 600 /opt/tizen-studio/package-manager/package-manager-cli.bin install --accept-license "$TIZEN_PACKAGES"; \
+    fi
 USER root
-# Installer records its user's home in SDK data paths; keep those paths private too.
-RUN mv /home/sdk /signing && ln -s /signing /home/sdk && chmod 700 /signing
+# Linux signing stores passwords through D-Bus Secret Service. The CLI can report
+# success without it, leaving unusable profile references instead of credentials.
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      dbus gnome-keyring python3 \
+    && rm -rf /var/lib/apt/lists/*
+# Installer requires a path under user.home. Keep its logical paths while moving
+# SDK binaries out of the private signing volume; SDK data stays in that volume.
+RUN rm /opt/tizen-studio && mv /home/sdk/tizen-studio /opt/tizen-studio \
+    && ln -s /opt/tizen-studio /home/sdk/tizen-studio \
+    && mv /home/sdk /signing && ln -s /signing /home/sdk && chmod 700 /signing
 COPY tools/tizen-entrypoint.sh /usr/local/bin/tizen-entrypoint
 COPY tools/tizen.sh /usr/local/bin/tizen-tool
-RUN chmod 755 /usr/local/bin/tizen-entrypoint /usr/local/bin/tizen-tool
+COPY tools/with-keyring.sh /usr/local/bin/with-keyring
+RUN chmod 755 /usr/local/bin/tizen-entrypoint /usr/local/bin/tizen-tool /usr/local/bin/with-keyring
 ENV HOME=/signing PATH=/opt/tizen-studio/tools/ide/bin:/opt/tizen-studio/tools:$PATH
 WORKDIR /workspace
 ENTRYPOINT ["/usr/local/bin/tizen-entrypoint"]

@@ -23,7 +23,7 @@ export function decodePhoto(photo, signal) {
 }
 
 export class Player {
-  constructor({ client, duration = 15, decode = decodePhoto, show, status = () => {}, error = () => {}, clock = globalThis }) {
+  constructor({ client, duration = 15, decode = decodePhoto, show, status = () => {}, error = () => {}, clock = typeof window === 'undefined' ? globalThis : window }) {
     Object.assign(this, { client, duration, decode, show, status, error, clock });
     this.history = [];
     this.index = -1;

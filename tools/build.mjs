@@ -1,5 +1,6 @@
-import { cp, lstat, readdir, rm, access } from 'node:fs/promises';
+import { cp, lstat, readdir, rm, access, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { build } from 'esbuild';
 
 // Refuse links and hidden/private files rather than accidentally shipping credentials.
 async function validate(directory) {
@@ -19,4 +20,7 @@ await access('app/index.html');
 await access('app/config.xml');
 await rm('dist', { recursive: true, force: true });
 await cp('app', 'dist', { recursive: true });
-console.log('Built local web assets and config.xml in dist/.');
+await build({ entryPoints: ['app/main.js'], outfile: 'dist/main.js', bundle: true, format: 'iife', target: 'chrome69', legalComments: 'none' });
+const html = await readFile('dist/index.html', 'utf8');
+await writeFile('dist/index.html', html.replace('<script type="module" src="main.js"></script>', '<script defer src="main.js"></script>'));
+console.log('Built classic Chromium 69 bundle, local assets and config.xml in dist/.');

@@ -6,4 +6,9 @@ case "$uid:$gid" in *[!0-9:]*|0:*|*:0) printf '%s\n' 'Use non-root numeric LOCAL
 mkdir -p /signing
 chmod 700 /signing
 chown -R "$uid:$gid" /signing
-exec gosu "$uid:$gid" /usr/local/bin/tizen-tool "$@"
+case "${1:-doctor}" in
+  profile-create|profile-repair|package)
+    exec gosu "$uid:$gid" /usr/local/bin/with-keyring /usr/local/bin/tizen-tool "$@"
+    ;;
+  *) exec gosu "$uid:$gid" /usr/local/bin/tizen-tool "$@" ;;
+esac

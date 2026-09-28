@@ -34,7 +34,7 @@ function updateMode() {
   $('mode-help').textContent = full ?
     'Présentation et rythme du site Kiosk original. En Full, le mot de passe est transmis dans le paramètre password de l’URL après confirmation.' :
     $('mode').value === 'enriched' ? 'Lecteur local avec horloge, date et fondu. Ce mode ne reproduit pas tous les widgets Kiosk.' :
-    'Lecteur local léger, conçu pour Tizen 6.5.';
+    'Lecteur local léger, conçu pour Tizen 5.5.';
 }
 $('mode').addEventListener('change', updateMode);
 function errorText(error) {
@@ -84,7 +84,7 @@ function showSettings(text = '') {
   $('viewer').hidden = true;
   $('settings').hidden = false;
   message(text);
-  $('url').focus();
+  $('mode').focus();
 }
 function ask(title, text) {
   if (modalResolve) closeModal(false);
@@ -180,7 +180,7 @@ async function run(start, automatic = false) {
   screensaver(false);
   player.start();
 }
-$('form').onsubmit = event => { event.preventDefault(); run(true); };
+$('form').onsubmit = event => { event.preventDefault(); if (editing) endEditing(); else run(true); };
 $('connect').onclick = () => run(false);
 $('configure').onclick = () => showSettings();
 $('retry').onclick = () => { if (player) { $('player-actions').hidden = true; $('player-status').textContent = 'Nouvelle tentative…'; screensaver(false); player.retry(); } };
@@ -198,16 +198,25 @@ $('clear').onclick = async () => {
   fill({ url: '', password: '', remember: false, duration: 15, fit: 'contain' });
   showSettings('Réglages effacés.');
 };
-function endEditing() { if (editing) { if (editing.tagName === 'INPUT') editing.readOnly = true; editing.blur(); editing.focus(); editing = null; } }
+function endEditing() {
+  if (!editing) return;
+  const field = editing;
+  editing = null;
+  field.blur();
+  $('connect').focus();
+}
 ['url', 'password'].forEach(id => {
-  $(id).readOnly = true;
-  $(id).addEventListener('click', () => { $(id).readOnly = false; editing = $(id); });
-  $(id).addEventListener('blur', () => { $(id).readOnly = true; if (editing === $(id)) editing = null; });
-});
-['duration', 'fit', 'mode'].forEach(id => {
-  $(id).addEventListener('click', () => { editing = $(id); });
+  // Samsung opens its IME when an editable input receives focus. Do not toggle
+  // readonly or cancel its key events: that can suppress native text entry.
+  $(id).addEventListener('focus', () => { editing = $(id); });
   $(id).addEventListener('blur', () => { if (editing === $(id)) editing = null; });
 });
+function changeChoice(select, direction) {
+  const options = Array.from(select.options).filter(option => !option.disabled);
+  const index = options.findIndex(option => option.value === select.value);
+  select.value = options[(index + direction + options.length) % options.length].value;
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
 function moveFocus(key) {
   const root = !$('modal').hidden ? $('modal') : (!$('settings').hidden ? $('settings') : !$('full-view').hidden ? $('full-view') : $('player-actions'));
   const controls = Array.from(root.querySelectorAll('input,select,button')).filter(el => !el.disabled && el.getClientRects().length);
@@ -228,8 +237,12 @@ function moveFocus(key) {
 }
 document.addEventListener('keydown', async event => {
   const code = event.keyCode;
-  const key = event.key;
+  const key = ({ 9: 'Tab', 13: 'Enter', 27: 'Escape', 32: ' ', 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 10009: 'BrowserBack' })[code] || event.key || '';
   const back = key === 'Escape' || key === 'BrowserBack' || code === 10009;
+  if (editing) {
+    if (code === 65376 || code === 65385 || back) endEditing();
+    return;
+  }
   if (modalResolve && key === 'Tab') {
     event.preventDefault();
     (document.activeElement === $('cancel') ? $('confirm') : $('cancel')).focus();
@@ -238,17 +251,12 @@ document.addEventListener('keydown', async event => {
   if (back) {
     event.preventDefault();
     if (modalResolve) { closeModal(false); return; }
-    if (editing) { endEditing(); return; }
     if (!$('viewer').hidden || !$('full-view').hidden) { showSettings(); return; }
     stop();
     if (await ask('Quitter Immich Kiosk ?', 'Le diaporama sera arrêté.')) {
       stop();
       try { window.tizen.application.getCurrentApplication().exit(); } catch (_) { message('Application arrêtée. Vous pouvez fermer cette fenêtre.'); }
     }
-    return;
-  }
-  if (editing) {
-    if (key === 'Enter') { event.preventDefault(); endEditing(); }
     return;
   }
   if (!modalResolve && (key === 'ArrowUp' || code === 38) && (!$('viewer').hidden || !$('full-view').hidden)) {
@@ -272,11 +280,14 @@ document.addEventListener('keydown', async event => {
     }
     return;
   }
-  if (key.startsWith('Arrow')) { event.preventDefault(); moveFocus(key); }
-  else if (key === 'Enter' && document.activeElement === $('remember')) { event.preventDefault(); $('remember').click(); }
-  else if (key === 'Enter' && ['url', 'password', 'duration', 'fit', 'mode'].includes(document.activeElement.id)) {
-    event.preventDefault(); editing = document.activeElement;
-    if (editing.tagName === 'INPUT') editing.readOnly = false;
+  const focused = document.activeElement;
+  if (focused.tagName === 'SELECT' && ['ArrowLeft', 'ArrowRight', 'Enter'].includes(key)) {
+    event.preventDefault();
+    changeChoice(focused, key === 'ArrowLeft' ? -1 : 1);
+  } else if (key.startsWith('Arrow')) { event.preventDefault(); moveFocus(key); }
+  else if (key === 'Enter' && (focused === $('remember') || focused.tagName === 'BUTTON')) {
+    event.preventDefault();
+    focused.click();
   }
 });
 document.addEventListener('visibilitychange', () => {
@@ -300,5 +311,7 @@ try {
 } catch (_) { /* Desktop preview has no TV APIs. */ }
 try { fill(storage ? loadSettings(storage) : { url: '', password: '', remember: false, duration: 15, fit: 'contain' }); }
 catch (_) { message('Réglages enregistrés illisibles. Saisissez à nouveau le serveur.'); }
-$('url').focus();
+$('mode').focus();
+document.documentElement.setAttribute('data-kiosk-ready', 'true');
+window.dispatchEvent(new Event('kiosk-ready'));
 if ($('url').value) run(true, true);

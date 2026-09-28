@@ -2,6 +2,7 @@
 **
 !Dockerfile
 !Dockerfile.tizen
+!Dockerfile.certificates
 !package.json
 !package-lock.json
 !tools/

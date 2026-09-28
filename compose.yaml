@@ -38,7 +38,8 @@ services:
         TIZEN_ACCEPT_LICENSE: ${TIZEN_ACCEPT_LICENSE:-no}
         TIZEN_INSTALLER_SHA256: ${TIZEN_INSTALLER_SHA256:-unset}
         TIZEN_PACKAGES: ${TIZEN_PACKAGES:-WebCLI}
-      secrets: [tizen_installer]
+      additional_contexts:
+        tizen_installer: ${TIZEN_INSTALLER_DIR:-/nonexistent/tizen-installer}
     init: true
     working_dir: /workspace
     environment:
@@ -47,12 +48,7 @@ services:
     volumes:
       - .:/workspace
       - signing:/signing
-      - type: bind
-        source: ${TIZEN_CERTIFICATES_DIR:-/nonexistent/tizen-certificates}
-        target: /certificates
-        read_only: true
-        bind:
-          create_host_path: false
+      - ${TIZEN_CERTIFICATES_DIR:-certificate_import}:/certificates:ro
     command: [doctor]
   # Linux-only fallback after bridge connectivity has been tested with the TV.
   # No ports, privilege escalation or Docker socket; deliberately not the default.
@@ -60,12 +56,30 @@ services:
     <<: *tizen
     profiles: [tizen-host]
     network_mode: host
+  certificate-ui:
+    image: immich-kiosk-tizen-certificates:local
+    profiles: [certificates]
+    build:
+      context: .
+      dockerfile: Dockerfile.certificates
+      args:
+        TIZEN_ACCEPT_LICENSE: ${TIZEN_ACCEPT_LICENSE:-no}
+    environment:
+      LOCAL_UID: ${LOCAL_UID:-1000}
+      LOCAL_GID: ${LOCAL_GID:-1000}
+    ports: ["127.0.0.1:${CERTIFICATE_UI_PORT:-6080}:6080"]
+    networks: [certificate_gui]
+    volumes:
+      - signing:/signing
+      - .:/workspace:ro
+    shm_size: 1gb
+    security_opt: ["no-new-privileges:true"]
 
-secrets:
-  tizen_installer:
-    file: ${TIZEN_INSTALLER_FILE:-/nonexistent/tizen-studio-installer.bin}
+networks:
+  certificate_gui:
 
 volumes:
   dependencies:
   cache:
   signing:
+  certificate_import:

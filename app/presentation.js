@@ -1,5 +1,5 @@
 export class Presentation {
-  constructor({ container, overlay, time, date, clock = globalThis, now = () => new Date() }) {
+  constructor({ container, overlay, time, date, clock = typeof window === 'undefined' ? globalThis : window, now = () => new Date() }) {
     Object.assign(this, { container, overlay, time, date, clock, now });
     this.mode = 'simple';
     this.active = false;

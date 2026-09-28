@@ -5,11 +5,11 @@
   "type": "module",
   "engines": { "node": "22.14.0" },
   "scripts": {
-    "dev": "node tools/serve.mjs",
+    "dev": "node tools/build.mjs && node tools/serve.mjs",
     "build": "node tools/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "test:browser": "node tests/browser.mjs",
+    "test:browser": "node tools/build.mjs && node tests/browser.mjs",
     "package:unsigned": "node tools/build.mjs && node tools/package.mjs"
   },
-  "devDependencies": { "playwright": "1.51.1" }
+  "devDependencies": { "esbuild": "0.25.1", "playwright": "1.51.1" }
 }

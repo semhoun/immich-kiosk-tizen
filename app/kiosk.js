@@ -73,8 +73,9 @@ export function photoParams(settings) {
   params.set('use_original_image', 'false');
   params.set('background_blur', 'false');
   params.set('layout', 'single');
-  params.set('client_width', String(Math.max(1, Math.round(globalThis.innerWidth || 1920))));
-  params.set('client_height', String(Math.max(1, Math.round(globalThis.innerHeight || 1080))));
+  const viewport = typeof window === 'undefined' ? {} : window;
+  params.set('client_width', String(Math.max(1, Math.round(viewport.innerWidth || 1920))));
+  params.set('client_height', String(Math.max(1, Math.round(viewport.innerHeight || 1080))));
   params.set('client_time', new Date().toISOString());
   return params;
 }

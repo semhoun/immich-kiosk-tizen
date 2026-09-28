@@ -94,9 +94,12 @@ const app = await server(async (req, res) => {
   const file = path === '/' ? 'index.html' : path.slice(1);
   if (!/^[\w.-]+$/.test(file)) { res.writeHead(404); res.end(); return; }
   try {
-    const content = await readFile(new URL(`../app/${file}`, import.meta.url));
+    const content = await readFile(new URL(`../dist/${file}`, import.meta.url));
     res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
-    res.end(content);
+    // Mask the unsupported global in application modules, not in Playwright's
+    // own runtime, which requires it even when evaluating a test expression.
+    const classic = file === 'main.js' || file === 'startup.js';
+    res.end(file.endsWith('.js') ? (classic ? '(function () { const globalThis = undefined;\n' + content + '\n})();' : 'const globalThis = undefined;\n' + content) : content);
   } catch (_) { res.writeHead(404); res.end(); }
 });
 let browser;
@@ -211,9 +214,50 @@ try {
   mode = 'data';
   await page.goto(app.origin);
   await page.locator('#url').waitFor();
-  await page.locator('#url:focus').waitFor();
+  await page.locator('#mode:focus').waitFor();
+  assert.equal(await page.locator('script[src="main.js"][type="module"]').count(), 0);
+  assert.equal(await page.locator('#startup-status').isVisible(), false);
+  const remote = code => page.evaluate(code => {
+    const event = new KeyboardEvent('keydown', { key: 'Unidentified', keyCode: code, which: code, bubbles: true, cancelable: true });
+    document.activeElement.dispatchEvent(event);
+    return event.defaultPrevented;
+  }, code);
+  await remote(39);
+  assert.equal(await page.locator('#mode').inputValue(), 'enriched');
+  await remote(37);
+  assert.equal(await page.locator('#mode').inputValue(), 'simple');
+  await remote(13);
+  assert.equal(await page.locator('#mode').inputValue(), 'enriched');
+  await remote(37);
+  await remote(40);
+  assert.equal(await page.locator('#url').evaluate(el => el === document.activeElement && !el.readOnly), true);
+  assert.equal(await remote(13), false, 'Native IME Enter must not be cancelled');
+  await page.locator('#url').pressSequentially('https://typed.invalid/');
+  assert.equal(await page.locator('#url').inputValue(), 'https://typed.invalid/');
+  assert.equal(await remote(37), false, 'Text cursor movement belongs to the IME');
+  await remote(65376);
+  assert.equal(await page.locator('#connect').evaluate(el => el === document.activeElement), true);
+  await page.locator('#password').focus();
+  await page.locator('#password').pressSequentially('temporary');
+  assert.equal(await page.locator('#password').inputValue(), 'temporary');
+  await page.locator('#password').fill('');
+  await remote(65385);
+  assert.equal(await page.locator('#modal').isVisible(), false);
+  assert.equal(await page.locator('#connect').evaluate(el => el === document.activeElement), true);
+  await page.locator('#remember').focus();
+  await remote(13);
+  assert.equal(await page.locator('#remember').isChecked(), true);
+  await remote(13);
+  assert.equal(await page.locator('#remember').isChecked(), false);
+  await page.locator('#clear').focus();
+  await remote(13);
+  await page.locator('#modal:not([hidden])').waitFor();
+  await remote(13);
+  assert.equal(await page.locator('#modal').isVisible(), false);
+  await page.locator('#mode').focus();
+  console.log('PASS classic bundle startup, numeric Samsung keys, editable inputs and native IME Done/Cancel');
   await page.keyboard.press('ArrowDown');
-  assert.notEqual(await page.evaluate(() => document.activeElement.id), 'url');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'url');
   await page.locator('#url').click();
   await page.locator('#url').fill(`${kiosk.origin}/base?album=one&album=two&password=test-secret`);
   await page.keyboard.press('Enter');
@@ -384,7 +428,7 @@ try {
   await page.locator('#cancel').click();
   assert.equal(await page.locator('#full-frame iframe').count(), 0);
   console.log('PASS Full automatic HTTPS startup with remembered password, keeping HTTP secret confirmation');
-  console.log('Browser validation uses container Chromium, NOT Tizen 6.5/Chromium 85 hardware.');
+  console.log('Browser validation uses container Chromium with globalThis masked in app modules, NOT Tizen 5.5/Chromium 69 hardware.');
 } finally {
   if (browser) await browser.close();
   for (const instance of clients) {

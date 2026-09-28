@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.xml': 'application/xml', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 
-export function createStaticServer(directory = 'app') {
+export function createStaticServer(directory = 'dist') {
   const root = resolve(directory);
   return createServer(async (request, response) => {
     try {
@@ -31,6 +31,6 @@ export function createStaticServer(directory = 'app') {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const port = Number(process.env.PORT || 8080);
-  const server = createStaticServer(process.env.SERVE_DIR || 'app');
+  const server = createStaticServer(process.env.SERVE_DIR || 'dist');
   server.listen(port, process.env.HOST || '0.0.0.0', () => console.log(`Preview on container port ${port}`));
 }
